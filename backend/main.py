@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers import market_data
+from routers import market_data
 
 app = FastAPI(title="AlgoLabs F&O API")
 

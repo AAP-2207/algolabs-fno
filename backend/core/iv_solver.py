@@ -1,5 +1,5 @@
 from scipy.optimize import brentq
-from backend.core.bsm import bs_price
+from core.bsm import bs_price
 
 def implied_volatility(price: float, S: float, K: float, T: float, r: float, option_type: str) -> float:
     """

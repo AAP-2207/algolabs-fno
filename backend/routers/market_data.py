@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from backend.services import nse_client, yfinance_client
+from services import nse_client, yfinance_client
 
 router = APIRouter(prefix="/api", tags=["Market Data"])
 
