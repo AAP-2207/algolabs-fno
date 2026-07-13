@@ -37,8 +37,8 @@ export const PnlPage: React.FC = () => {
   const [previousS, setPreviousS] = useState<number>(24300.0);
   const [currentS, setCurrentS] = useState<number>(24350.0);
   const [daysElapsed, setDaysElapsed] = useState<number>(1.0);
-  const [volatility, setVolatility] = useState<number>(15.0); // as percentage
-  const [currentVolatility, setCurrentVolatility] = useState<number>(15.5); // as percentage
+  const [volatility, setVolatility] = useState<number>(7.86); // as percentage
+  const [currentVolatility, setCurrentVolatility] = useState<number>(8.94); // as percentage
   const [daysToExpiry, setDaysToExpiry] = useState<number>(7.0);
 
   const [result, setResult] = useState<PnlDecomposeResponse | null>(null);
