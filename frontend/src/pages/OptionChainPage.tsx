@@ -1,6 +1,8 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { mockOptionChainResponse } from "../mockData";
+import type { OptionChainResponse } from "../mockData";
 import { FreshnessBadge } from "../components/FreshnessBadge";
+import { fetchOptionChain } from "../api/optionChain";
 import {
   Table,
   TableBody,
@@ -13,8 +15,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, Layers, Flame, TrendingUp } from "lucide-react";
 
 export const OptionChainPage: React.FC = () => {
-  // Wire to mockData
-  const response = mockOptionChainResponse;
+  const [data, setData] = useState<OptionChainResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async (isInitial: boolean) => {
+    try {
+      if (isInitial) setLoading(true);
+      const res = await fetchOptionChain("NIFTY");
+      setData(res);
+      setError(null);
+    } catch (err: any) {
+      const errMsg = err.message || "Failed to connect to backend api";
+      console.error("Error fetching option chain:", errMsg);
+      setError(errMsg);
+      // Fallback to mockData on initial error so page is not empty
+      setData((prev) => prev || mockOptionChainResponse);
+    } finally {
+      if (isInitial) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), 8000);
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Use data state or fallback to mockData if null
+  const response = data || mockOptionChainResponse;
   const chainData = response.data;
   const spot = chainData.records.underlyingValue;
   const timestamp = chainData.records.timestamp;
@@ -96,8 +127,68 @@ export const OptionChainPage: React.FC = () => {
     return { maxCeOI: ceMax, maxPeOI: peMax };
   }, [strikes]);
 
+  if (loading && !data) {
+    return (
+      <div className="flex-1 flex flex-col bg-zinc-950 text-zinc-100 overflow-y-auto">
+        {/* STICKY HEADER SKELETON */}
+        <header className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800/80 px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-6 animate-pulse">
+            <div>
+              <div className="h-3 bg-zinc-850 rounded w-16" />
+              <div className="h-6 bg-zinc-800 rounded w-24 mt-1" />
+            </div>
+            <div className="h-8 w-px bg-zinc-800" />
+            <div>
+              <div className="h-3 bg-zinc-850 rounded w-16" />
+              <div className="h-6 bg-zinc-800 rounded w-32 mt-1" />
+            </div>
+          </div>
+          <div className="h-8 bg-zinc-850 rounded w-40 animate-pulse" />
+        </header>
+
+        {/* Skeleton Loader Main Content */}
+        <div className="p-8 space-y-8 flex-1 max-w-7xl w-full mx-auto animate-pulse">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="bg-zinc-900/40 border-zinc-800/70 h-28">
+                <CardHeader className="pb-2">
+                  <div className="h-3 bg-zinc-850 rounded w-1/3" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-zinc-800 rounded w-1/2 mt-1" />
+                  <div className="h-3 bg-zinc-900 rounded w-2/3 mt-2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="border border-zinc-800 bg-zinc-900/20 rounded-xl overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/40 flex justify-between">
+              <div className="h-4 bg-zinc-850 rounded w-1/4" />
+              <div className="h-3 bg-zinc-850 rounded w-1/6" />
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="h-8 bg-zinc-900 rounded w-full" />
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                <div key={i} className="h-6 bg-zinc-950 rounded w-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-zinc-950 text-zinc-100 overflow-y-auto">
+      {error && (
+        <div className="bg-amber-950/40 border-b border-amber-900/60 px-8 py-2 text-xs flex items-center justify-between text-amber-300">
+          <span>Using cached local data. Connection failed: {error}</span>
+          <span className="font-semibold text-[10px] text-amber-500 font-mono tracking-wider animate-pulse uppercase">
+            Retrying...
+          </span>
+        </div>
+      )}
       
       {/* STICKY HEADER */}
       <header className="sticky top-0 z-20 backdrop-blur-md bg-zinc-950/85 border-b border-zinc-800/80 px-8 py-4 flex items-center justify-between">

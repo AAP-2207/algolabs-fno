@@ -4,6 +4,7 @@ import OptionChainPage from "./pages/OptionChainPage";
 import GreeksPage from "./pages/GreeksPage";
 import PnlPage from "./pages/PnlPage";
 import DosPage from "./pages/DosPage";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   return (
@@ -15,7 +16,11 @@ function App() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 relative">
           <Routes>
-            <Route path="/chain" element={<OptionChainPage />} />
+            <Route path="/chain" element={
+              <ErrorBoundary>
+                <OptionChainPage />
+              </ErrorBoundary>
+            } />
             <Route path="/greeks" element={<GreeksPage />} />
             <Route path="/pnl" element={<PnlPage />} />
             <Route path="/dos" element={<DosPage />} />
