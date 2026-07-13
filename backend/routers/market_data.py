@@ -1,5 +1,6 @@
 import os
 import logging
+import datetime
 from fastapi import APIRouter, HTTPException, Query
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -32,6 +33,7 @@ router = APIRouter(prefix="/api", tags=["Market Data"])
 def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asset symbol (e.g. NIFTY)")):
     """Fetch option chain data for NIFTY or other indices, querying Supabase first and falling back to nse_client."""
     symbol_upper = symbol.upper()
+    current_time = datetime.datetime.now(datetime.timezone.utc)
     if supabase_client is not None:
         try:
             logger.info(f"Querying Supabase for option chain snapshot of {symbol_upper}...")
@@ -48,11 +50,24 @@ def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asse
                 fetched_at = record.get("fetched_at")
                 
                 if isinstance(data, dict):
-                    # Inject source and fetched_at fields
-                    data["source"] = "live-polled"
-                    data["fetched_at"] = fetched_at
-                    logger.info(f"Serving option chain from Supabase snapshot fetched at {fetched_at}.")
-                    return data
+                    # Calculate age_minutes fresh on each request
+                    try:
+                        fetched_dt = datetime.datetime.fromisoformat(fetched_at)
+                        if fetched_dt.tzinfo is None:
+                            fetched_dt = fetched_dt.replace(tzinfo=datetime.timezone.utc)
+                        age_minutes = (current_time - fetched_dt).total_seconds() / 60.0
+                    except Exception as parse_err:
+                        logger.error(f"Error parsing fetched_at '{fetched_at}': {parse_err}")
+                        age_minutes = 0.0
+                    
+                    logger.info(f"Serving option chain from Supabase snapshot fetched at {fetched_at} ({age_minutes:.2f} minutes old).")
+                    
+                    return {
+                        "data": data,
+                        "fetched_at": fetched_at,
+                        "source": "live-polled",
+                        "age_minutes": age_minutes
+                    }
                 else:
                     logger.warning("Found record in Supabase, but 'data' column is not a JSON object.")
             else:
@@ -62,7 +77,13 @@ def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asse
             
     # Last-resort fallback
     logger.info(f"Falling back to direct fetch for symbol {symbol_upper}...")
-    return nse_client.get_option_chain(symbol_upper)
+    nse_data = nse_client.get_option_chain(symbol_upper)
+    return {
+        "data": nse_data,
+        "fetched_at": current_time.isoformat(),
+        "source": "mock",
+        "age_minutes": 0.0
+    }
 
 @router.get("/spot")
 def get_spot_price(ticker: str = Query("^NSEI", description="Yahoo Finance ticker symbol (e.g. ^NSEI)")):

@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -55,7 +56,8 @@ def main():
             logger.info("Writing live snapshot to Supabase 'option_chain_snapshots' table...")
             row = {
                 "symbol": symbol,
-                "data": data
+                "data": data,
+                "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }
             
             response = supabase.table("option_chain_snapshots").insert(row).execute()

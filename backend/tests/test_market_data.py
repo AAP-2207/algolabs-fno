@@ -18,14 +18,24 @@ def test_get_option_chain():
     # Request option chain for NIFTY index
     response = client.get("/api/option-chain?symbol=NIFTY")
     assert response.status_code == 200
-    data = response.json()
-    assert "source" in data
-    assert data["source"] in ("live", "mock", "live-polled")
-    assert "records" in data
-    assert "underlyingValue" in data["records"]
-    assert data["records"]["underlyingValue"] > 0
-    assert "data" in data["records"]
-    assert len(data["records"]["data"]) > 0
+    res_data = response.json()
+    
+    # Assert top-level keys
+    assert "source" in res_data
+    assert res_data["source"] in ("live-polled", "mock")
+    assert "fetched_at" in res_data
+    assert isinstance(res_data["fetched_at"], str)
+    assert "age_minutes" in res_data
+    assert isinstance(res_data["age_minutes"], (int, float))
+    assert "data" in res_data
+    
+    # Assert content of the actual option chain data under the "data" key
+    opt_chain = res_data["data"]
+    assert "records" in opt_chain
+    assert "underlyingValue" in opt_chain["records"]
+    assert opt_chain["records"]["underlyingValue"] > 0
+    assert "data" in opt_chain["records"]
+    assert len(opt_chain["records"]["data"]) > 0
 
 def test_get_historical_ohlcv():
     # Verify historical data retrieval helper
