@@ -154,7 +154,8 @@ def get_option_chain(symbol: str = "NIFTY") -> Dict[str, Any]:
         
         data = r_api.json()
         data["source"] = "live"
-        logger.info(f"Successfully fetched live option chain for {symbol_upper}.")
+        strike_count = len(data.get("records", {}).get("data", []))
+        logger.info(f"Successfully fetched live option chain for {symbol_upper} containing {strike_count} strikes.")
         return data
         
     except Exception as e:
