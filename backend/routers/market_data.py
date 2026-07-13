@@ -4,7 +4,10 @@ import datetime
 from fastapi import APIRouter, HTTPException, Query
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from services import nse_client, yfinance_client
+try:
+    from ..services import nse_client, yfinance_client
+except ImportError:
+    from services import nse_client, yfinance_client
 
 logger = logging.getLogger(__name__)
 
