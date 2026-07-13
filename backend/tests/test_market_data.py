@@ -20,7 +20,7 @@ def test_get_option_chain():
     assert response.status_code == 200
     data = response.json()
     assert "source" in data
-    assert data["source"] in ("live", "mock")
+    assert data["source"] in ("live", "mock", "live-polled")
     assert "records" in data
     assert "underlyingValue" in data["records"]
     assert data["records"]["underlyingValue"] > 0

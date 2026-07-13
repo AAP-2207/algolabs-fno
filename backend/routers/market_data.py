@@ -1,12 +1,68 @@
+import os
+import logging
 from fastapi import APIRouter, HTTPException, Query
+from dotenv import load_dotenv
+from supabase import create_client, Client
 from services import nse_client, yfinance_client
+
+logger = logging.getLogger(__name__)
+
+# Load env variables for local execution and testing
+load_dotenv()
+
+# Initialize Supabase client
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+# Standardize Supabase URL (strip trailing rest/v1 or rest/v1/ paths)
+if supabase_url and (supabase_url.endswith("/rest/v1/") or supabase_url.endswith("/rest/v1")):
+    supabase_url = supabase_url.replace("/rest/v1/", "").replace("/rest/v1", "")
+
+supabase_client: Client = None
+if supabase_url and supabase_key:
+    try:
+        supabase_client = create_client(supabase_url, supabase_key)
+        logger.info("Supabase client initialized successfully in market_data router.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase client: {str(e)}")
 
 router = APIRouter(prefix="/api", tags=["Market Data"])
 
 @router.get("/option-chain")
 def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asset symbol (e.g. NIFTY)")):
-    """Fetch option chain data for NIFTY or other indices with automatic mock fallback on failure."""
-    return nse_client.get_option_chain(symbol)
+    """Fetch option chain data for NIFTY or other indices, querying Supabase first and falling back to nse_client."""
+    symbol_upper = symbol.upper()
+    if supabase_client is not None:
+        try:
+            logger.info(f"Querying Supabase for option chain snapshot of {symbol_upper}...")
+            response = supabase_client.table("option_chain_snapshots") \
+                .select("data, fetched_at") \
+                .eq("symbol", symbol_upper) \
+                .order("fetched_at", desc=True) \
+                .limit(1) \
+                .execute()
+            
+            if response.data and len(response.data) > 0:
+                record = response.data[0]
+                data = record.get("data")
+                fetched_at = record.get("fetched_at")
+                
+                if isinstance(data, dict):
+                    # Inject source and fetched_at fields
+                    data["source"] = "live-polled"
+                    data["fetched_at"] = fetched_at
+                    logger.info(f"Serving option chain from Supabase snapshot fetched at {fetched_at}.")
+                    return data
+                else:
+                    logger.warning("Found record in Supabase, but 'data' column is not a JSON object.")
+            else:
+                logger.warning(f"No option chain snapshots found in Supabase for symbol {symbol_upper}.")
+        except Exception as e:
+            logger.error(f"Error querying Supabase for symbol {symbol_upper}: {str(e)}. Falling back to direct fetch.")
+            
+    # Last-resort fallback
+    logger.info(f"Falling back to direct fetch for symbol {symbol_upper}...")
+    return nse_client.get_option_chain(symbol_upper)
 
 @router.get("/spot")
 def get_spot_price(ticker: str = Query("^NSEI", description="Yahoo Finance ticker symbol (e.g. ^NSEI)")):
