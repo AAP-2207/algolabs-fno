@@ -4,6 +4,7 @@ import { Cpu, AlertTriangle, RefreshCw } from "lucide-react";
 import { fetchDosSignal } from "../api/dos";
 import type { DosSignalResponse } from "../api/dos";
 import { SuperTrendSignalPanel } from "../components/dos/SuperTrendChart";
+import { StopLossMonitor } from "../components/dos/StopLossMonitor";
 
 export const DosPage: React.FC = () => {
   const [data, setData] = useState<DosSignalResponse | null>(null);
@@ -166,6 +167,29 @@ export const DosPage: React.FC = () => {
 
             {/* Right Column: Execution Recommendations & Option Details */}
             <div className="space-y-6">
+              {data.open_trade && (() => {
+                const isBreached = (data.open_trade.current_premium ?? 0) >= data.open_trade.initial_sl_price;
+                const breachReason = isBreached ? "initial" : null;
+                return (
+                  <StopLossMonitor
+                    entryPremium={data.open_trade.entry_premium}
+                    currentPremium={data.open_trade.current_premium ?? 0}
+                    initialSlLevel={data.open_trade.initial_sl_price}
+                    trailingSlLevel={null}
+                    dayType={data.open_trade.day_type as "wednesday" | "thursday"}
+                    isBreached={isBreached}
+                    breachReason={breachReason}
+                    /* 
+                       TODO/FOLLOW-UP: The lotSize is currently hardcoded on the frontend. 
+                       Ideally, the backend endpoint GET /api/dos/signal should return the lot_size 
+                       directly (referencing BANKNIFTY_LOT_SIZE = 30 from core/trade_lifecycle.py)
+                       to serve as a single source of truth across the stack.
+                    */
+                    lotSize={30}
+                  />
+                );
+              })()}
+
               <Card className="bg-gradient-to-b from-indigo-950/20 to-zinc-900/30 border-zinc-800 shadow-2xl backdrop-blur-sm h-full flex flex-col">
                 <CardHeader className="border-b border-zinc-800/50 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-indigo-400 font-mono flex items-center gap-2">

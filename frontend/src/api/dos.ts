@@ -10,6 +10,17 @@ export interface CandleData {
   trend: "up" | "down" | string;
 }
 
+export interface OpenTradeData {
+  strike: number;
+  option_side: string;
+  entry_premium: number;
+  entry_time: string;
+  day_type: "wednesday" | "thursday" | string;
+  current_premium: number | null;
+  initial_sl_price: number;
+  unrealized_pnl: number | null;
+}
+
 export interface DosSignalResponse {
   active: boolean;
   reason?: string;
@@ -28,6 +39,7 @@ export interface DosSignalResponse {
   theta?: number | null;
   vega?: number | null;
   candles?: CandleData[];
+  open_trade?: OpenTradeData | null;
 }
 
 /**

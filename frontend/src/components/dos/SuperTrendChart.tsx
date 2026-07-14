@@ -186,13 +186,14 @@ export function SuperTrendSignalPanel({
                 dataKey="time"
                 stroke="rgba(255,255,255,0.3)"
                 tick={{ fontSize: 12 }}
-                interval={Math.max(0, Math.floor(candleData.length / 6))}
+                interval={Math.max(0, Math.floor(candleData.length / 8))}
               />
               <YAxis
                 stroke="rgba(255,255,255,0.3)"
                 tick={{ fontSize: 12 }}
                 domain={['dataMin - 50', 'dataMax + 50']}
-                width={60}
+                tickFormatter={(value) => Math.round(value).toLocaleString()}
+                width={70}
               />
               <Tooltip content={<CustomTooltip />} />
 

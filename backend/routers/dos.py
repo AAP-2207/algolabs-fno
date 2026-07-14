@@ -23,6 +23,23 @@ try:
 except ImportError:
     from routers.market_data import get_greeks
 
+import os
+from supabase import create_client, Client
+
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+if supabase_url and (supabase_url.endswith("/rest/v1/") or supabase_url.endswith("/rest/v1")):
+    supabase_url = supabase_url.replace("/rest/v1/", "").replace("/rest/v1", "")
+
+supabase_client: Client = None
+if supabase_url and supabase_key:
+    try:
+        supabase_client = create_client(supabase_url, supabase_key)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"DOS Router: Failed to initialize Supabase client: {e}")
+
 router = APIRouter()
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -153,7 +170,7 @@ def get_dos_signal(bypass_gating: bool = False):
     valid_candles = result.dropna(subset=["supertrend"])
     for timestamp, row in valid_candles.iterrows():
         chart_candles.append({
-            "time": timestamp.strftime("%H:%M") if hasattr(timestamp, "strftime") else str(timestamp),
+            "time": timestamp.strftime("%d-%b %H:%M") if hasattr(timestamp, "strftime") else str(timestamp),
             "open": float(row["open"]),
             "high": float(row["high"]),
             "low": float(row["low"]),
@@ -162,9 +179,126 @@ def get_dos_signal(bypass_gating: bool = False):
             "trend": str(row["trend"]),
         })
 
+    # Initialize open_trade as None
+    open_trade_response = None
+
+    if supabase_client is not None:
+        try:
+            from core.trade_lifecycle import (
+                should_enter_trade,
+                get_day_type,
+                check_exit_condition,
+                compute_pnl,
+                compute_initial_sl_price,
+                BANKNIFTY_LOT_SIZE
+            )
+            
+            today_date = now.date().isoformat()
+            # 1. Fetch trades for today (IST)
+            response = supabase_client.table("dos_trades") \
+                .select("*") \
+                .eq("trade_date", today_date) \
+                .eq("is_backtest", False) \
+                .execute()
+            
+            trades_today = response.data if (response and response.data) else []
+            
+            # Find the active open trade if any (where exit_time is null)
+            open_trade_row = None
+            for t in trades_today:
+                if t.get("exit_time") is None:
+                    open_trade_row = t
+                    break
+            
+            has_open_trade_today = len(trades_today) > 0
+            
+            # 2. No open trade today, and we're active
+            if open_trade_row is None and active:
+                day_type = get_day_type(now)
+                if day_type is not None:
+                    should_enter = should_enter_trade(
+                        is_dos_active=True,
+                        has_open_trade_today=has_open_trade_today
+                    )
+                    if should_enter:
+                        entry_premium = signal.get("ltp")
+                        if entry_premium is not None:
+                            insert_data = {
+                                "trade_date": today_date,
+                                "day_type": day_type,
+                                "option_type": signal["option_side"],
+                                "strike": signal["recommended_strike"],
+                                "entry_time": now.isoformat(),
+                                "entry_premium": float(entry_premium),
+                                "is_backtest": False
+                            }
+                            insert_res = supabase_client.table("dos_trades").insert(insert_data).execute()
+                            if insert_res and insert_res.data:
+                                open_trade_row = insert_res.data[0]
+                        else:
+                            logger.warning("DOS Trade Lifecycle: Entry premium is None, skipping entry this cycle.")
+            
+            # 3. Open trade exists, check exit condition
+            elif open_trade_row is not None:
+                current_premium = signal.get("ltp")
+                if current_premium is not None:
+                    trade_to_check = {
+                        "strike": int(open_trade_row["strike"]),
+                        "option_side": open_trade_row["option_type"],
+                        "entry_premium": float(open_trade_row["entry_premium"]),
+                        "entry_time": open_trade_row["entry_time"],
+                        "day_type": open_trade_row["day_type"],
+                    }
+                    should_exit, reason = check_exit_condition(
+                        open_trade=trade_to_check,
+                        current_premium=float(current_premium),
+                        trend_just_flipped_against_position=signal["just_flipped"],
+                        now=now
+                    )
+                    if should_exit:
+                        pnl_value = compute_pnl(float(open_trade_row["entry_premium"]), float(current_premium), quantity=BANKNIFTY_LOT_SIZE)
+                        update_data = {
+                            "exit_time": now.isoformat(),
+                            "exit_premium": float(current_premium),
+                            "exit_reason": reason,
+                            "pnl": float(pnl_value)
+                        }
+                        update_res = supabase_client.table("dos_trades") \
+                            .update(update_data) \
+                            .eq("id", open_trade_row["id"]) \
+                            .execute()
+                        open_trade_row = None
+                else:
+                    logger.debug("DOS Trade Lifecycle: Current premium is None, skipping exit checks this cycle.")
+
+            # 4. Form open_trade object for response
+            if open_trade_row is not None:
+                entry_premium = float(open_trade_row["entry_premium"])
+                current_premium = signal.get("ltp")
+                unrealized_pnl = None
+                if current_premium is not None:
+                    unrealized_pnl = entry_premium - float(current_premium)
+                
+                initial_sl_price = compute_initial_sl_price(entry_premium, open_trade_row["day_type"])
+                
+                open_trade_response = {
+                    "strike": int(open_trade_row["strike"]),
+                    "option_side": open_trade_row["option_type"],
+                    "entry_premium": entry_premium,
+                    "entry_time": open_trade_row["entry_time"],
+                    "day_type": open_trade_row["day_type"],
+                    "current_premium": current_premium,
+                    "initial_sl_price": initial_sl_price,
+                    "unrealized_pnl": unrealized_pnl
+                }
+        except Exception as e:
+            logger.error(f"DOS Trade Lifecycle: DB operation failed: {e}", exc_info=True)
+            open_trade_response = None
+
     return {
         "active": True,
         "timestamp": now.isoformat(),
         "candles": chart_candles,
+        "open_trade": open_trade_response,
         **signal,
     }
