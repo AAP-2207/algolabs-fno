@@ -299,8 +299,14 @@ def pnl_decompose(req: PnlDecomposeRequest):
     gamma_pnl = 0.5 * gamma_val * (dS ** 2) * req.quantity * sign
     theta_pnl = theta_val * req.days_elapsed * req.quantity * sign
     
-    d_sigma = (req.current_volatility - req.volatility) if req.current_volatility is not None else 0.0
-    vega_pnl = vega_val * d_sigma * req.quantity * sign
+    # d_sigma_raw is the change in volatility as a raw decimal (e.g. 0.0108
+    # for a move from 7.86% to 8.94%). vega_val is expressed per 1
+    # PERCENTAGE POINT of IV change (industry convention, see core/greeks.py),
+    # so we convert d_sigma to percentage points (multiply by 100) before
+    # multiplying, to keep both sides of this multiplication in the same units.
+    d_sigma_raw = (req.current_volatility - req.volatility) if req.current_volatility is not None else 0.0
+    d_sigma_percentage_points = d_sigma_raw * 100
+    vega_pnl = vega_val * d_sigma_percentage_points * req.quantity * sign
 
     # Residual P&L
     residual = total_pnl - (delta_pnl + gamma_pnl + theta_pnl + vega_pnl)

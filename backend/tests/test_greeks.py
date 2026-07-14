@@ -18,9 +18,15 @@ def test_greeks_atm():
     g = gamma(S, K, T, r, sigma)
     assert g > 0
 
-    # Vega should be positive
+    # Vega should be positive, and expressed per 1 percentage point of IV
+    # (industry convention) — for this ATM S=100,K=100,T=1,sigma=0.2 case,
+    # the correct value is approximately 0.397, NOT ~39.7 (that would mean
+    # the /100 conversion was accidentally removed).
     v = vega(S, K, T, r, sigma)
     assert v > 0
+    # For S=100,K=100,T=1,r=0.05,sigma=0.2: d1=0.35, so vega ≈ 0.3752
+    # (per 1 percentage point of IV, industry convention)
+    assert v == pytest.approx(0.3752, abs=0.001)
     
     # Theta checks
     t_call = theta(S, K, T, r, sigma, 'call')

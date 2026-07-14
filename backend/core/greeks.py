@@ -66,13 +66,17 @@ def theta(S: float, K: float, T: float, r: float, sigma: float, option_type: str
 
 def vega(S: float, K: float, T: float, r: float, sigma: float) -> float:
     """
-    Calculate Vega of a European option.
-    Vega measures the sensitivity of the option price to changes in volatility.
+    Calculate Vega of a European option, expressed per 1 percentage point
+    change in implied volatility (the industry-standard convention used by
+    brokers/terminals), NOT per a full 100-percentage-point (1.0) change in
+    sigma. This is why the result is divided by 100 — the raw Black-Scholes
+    partial derivative dV/dsigma gives the per-100-point figure, which reads
+    as wildly oversized (e.g. thousands) compared to what any real options
+    screen displays (typically single or double digits for index options).
     Vega is identical for call and put options.
     """
     if T <= 0 or S <= 0 or K <= 0 or sigma <= 0:
         return 0.0
-
     d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-    vega_val = S * np.sqrt(T) * norm.pdf(d1)
+    vega_val = S * np.sqrt(T) * norm.pdf(d1) / 100
     return float(vega_val)

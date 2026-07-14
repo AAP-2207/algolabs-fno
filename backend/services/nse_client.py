@@ -3,6 +3,11 @@ import requests
 import time
 from typing import Dict, Any
 
+try:
+    from ..core.bsm import bs_price
+except ImportError:
+    from core.bsm import bs_price
+
 logger = logging.getLogger(__name__)
 
 # Realistic Chrome Headers Setup
@@ -21,21 +26,53 @@ HEADERS_COMMON = {
 }
 
 def get_mock_data(symbol: str) -> Dict[str, Any]:
-    """Generates realistic mock data for NIFTY or BANKNIFTY on fallback."""
+    """Generates realistic mock data for NIFTY or BANKNIFTY on fallback.
+    Spot price is fetched live via yfinance (unaffected by the NSE/Akamai
+    block) so mock strikes stay centered near the real market, instead of
+    drifting stale relative to wherever the index actually is now."""
+    import yfinance as yf
+    import logging
+    logger = logging.getLogger(__name__)
+
     symbol_upper = symbol.upper()
-    if "BANK" in symbol_upper:
-        underlying = 52300.0
-        strikes = [52100, 52200, 52300, 52400, 52500]
-    else:
-        underlying = 24300.0
-        strikes = [24100, 24200, 24300, 24400, 24500]
+    ticker_map = {"BANKNIFTY": "^NSEBANK", "NIFTY": "^NSEI"}
+    yf_ticker = ticker_map.get(symbol_upper if symbol_upper in ticker_map else ("BANKNIFTY" if "BANK" in symbol_upper else "NIFTY"))
+
+    fallback_underlying = 52300.0 if "BANK" in symbol_upper else 24300.0
+
+    try:
+        ticker = yf.Ticker(yf_ticker)
+        hist = ticker.history(period="1d", interval="5m")
+        if not hist.empty:
+            underlying = float(hist["Close"].iloc[-1])
+        else:
+            logger.warning(f"get_mock_data: yfinance returned empty history for {yf_ticker}, using fallback spot price")
+            underlying = fallback_underlying
+    except Exception as e:
+        logger.warning(f"get_mock_data: failed to fetch live spot for {yf_ticker}, using fallback spot price. Error: {e}")
+        underlying = fallback_underlying
+
+    # Round to nearest 100, generate 5 strikes centered on that (2 below, ATM, 2 above)
+    atm_strike = round(underlying / 100) * 100
+    strikes = [atm_strike + offset for offset in (-200, -100, 0, 100, 200)]
 
     data = []
+    ASSUMED_MOCK_IV = 0.13  # 13%, realistic ballpark for Bank Nifty weekly IV
+    ASSUMED_MOCK_RISK_FREE_RATE = 0.07  # matches the MIBOR-proxy value used elsewhere in core/bsm tests
+    ASSUMED_MOCK_TIME_TO_EXPIRY = 3 / 365  # ~3 days, typical for a weekly expiry mock scenario
+
     for strike in strikes:
-        # Simple option pricing model for realistic looking mock prices
-        # ATM options cost ~100/200, ITM options capture intrinsic value
-        ce_price = max(underlying - strike, 0.0) + max(120.0 - abs(underlying - strike) * 0.6, 5.0)
-        pe_price = max(strike - underlying, 0.0) + max(120.0 - abs(underlying - strike) * 0.6, 5.0)
+        ce_price = bs_price(
+            S=underlying, K=strike, T=ASSUMED_MOCK_TIME_TO_EXPIRY,
+            r=ASSUMED_MOCK_RISK_FREE_RATE, sigma=ASSUMED_MOCK_IV, option_type="call",
+        )
+        pe_price = bs_price(
+            S=underlying, K=strike, T=ASSUMED_MOCK_TIME_TO_EXPIRY,
+            r=ASSUMED_MOCK_RISK_FREE_RATE, sigma=ASSUMED_MOCK_IV, option_type="put",
+        )
+        # Floor at a small positive value so deep OTM strikes never show as free/zero
+        ce_price = max(ce_price, 1.0)
+        pe_price = max(pe_price, 1.0)
 
         data.append({
             "strikePrice": strike,
