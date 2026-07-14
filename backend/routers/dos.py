@@ -81,9 +81,12 @@ def fetch_recent_bnf_candles(period: str = "5d") -> pd.DataFrame:
 
 
 @router.get("/api/dos/signal")
-def get_dos_signal():
+def get_dos_signal(bypass_gating: bool = False):
     now = get_ist_now()
-    active, reason = is_dos_active(now)
+    if bypass_gating:
+        active, reason = True, "active"
+    else:
+        active, reason = is_dos_active(now)
 
     if not active:
         return {
@@ -145,8 +148,23 @@ def get_dos_signal():
         signal["theta"] = None
         signal["vega"] = None
 
+    # Format historical candles for the frontend chart (dropping NaN warm-up rows)
+    chart_candles = []
+    valid_candles = result.dropna(subset=["supertrend"])
+    for timestamp, row in valid_candles.iterrows():
+        chart_candles.append({
+            "time": timestamp.strftime("%H:%M") if hasattr(timestamp, "strftime") else str(timestamp),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "supertrend": float(row["supertrend"]),
+            "trend": str(row["trend"]),
+        })
+
     return {
         "active": True,
         "timestamp": now.isoformat(),
+        "candles": chart_candles,
         **signal,
     }
