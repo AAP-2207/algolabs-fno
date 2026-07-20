@@ -52,6 +52,15 @@ def get_mock_data(symbol: str) -> Dict[str, Any]:
         logger.warning(f"get_mock_data: failed to fetch live spot for {yf_ticker}, using fallback spot price. Error: {e}")
         underlying = fallback_underlying
 
+    import random
+    import math
+
+    # Add small realistic tick-to-tick fluctuation (+/- 0.05%) so repeated polls
+    # don't show frozen, identical numbers during a demo — real quotes always
+    # show small movement between ticks even when the market is calm.
+    fluctuation_pct = random.uniform(-0.0005, 0.0005)
+    underlying = underlying * (1 + fluctuation_pct)
+
     # Round to nearest 100, generate 5 strikes centered on that (2 below, ATM, 2 above)
     atm_strike = round(underlying / 100) * 100
     strikes = [atm_strike + offset for offset in (-200, -100, 0, 100, 200)]
@@ -74,6 +83,12 @@ def get_mock_data(symbol: str) -> Dict[str, Any]:
         ce_price = max(ce_price, 1.0)
         pe_price = max(pe_price, 1.0)
 
+        # Scale OI so it peaks near ATM and tapers off
+        distance_from_atm = abs(strike - underlying)
+        base_oi = 50000
+        ce_oi = int(base_oi * math.exp(-0.5 * (distance_from_atm / (underlying * 0.02))**2)) + random.randint(100, 500)
+        pe_oi = int(base_oi * math.exp(-0.5 * (distance_from_atm / (underlying * 0.02))**2)) + random.randint(100, 500)
+
         data.append({
             "strikePrice": strike,
             "expiryDate": "2026-07-16",
@@ -82,9 +97,9 @@ def get_mock_data(symbol: str) -> Dict[str, Any]:
                 "expiryDate": "2026-07-16",
                 "underlying": symbol_upper,
                 "identifier": f"OPT{symbol_upper}16-07-2026CE{strike}",
-                "openInterest": 25000,
-                "changeinOpenInterest": 1500,
-                "totalTradedVolume": 65000,
+                "openInterest": ce_oi,
+                "changeinOpenInterest": int(ce_oi * 0.06),
+                "totalTradedVolume": int(ce_oi * 2.6),
                 "impliedVolatility": 13.5,
                 "lastPrice": round(ce_price, 2),
                 "underlyingValue": underlying
@@ -94,9 +109,9 @@ def get_mock_data(symbol: str) -> Dict[str, Any]:
                 "expiryDate": "2026-07-16",
                 "underlying": symbol_upper,
                 "identifier": f"OPT{symbol_upper}16-07-2026PE{strike}",
-                "openInterest": 30000,
-                "changeinOpenInterest": 2200,
-                "totalTradedVolume": 85000,
+                "openInterest": pe_oi,
+                "changeinOpenInterest": int(pe_oi * 0.07),
+                "totalTradedVolume": int(pe_oi * 2.8),
                 "impliedVolatility": 14.2,
                 "lastPrice": round(pe_price, 2),
                 "underlyingValue": underlying

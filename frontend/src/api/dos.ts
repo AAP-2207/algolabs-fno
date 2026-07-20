@@ -55,3 +55,57 @@ export async function fetchDosSignal(bypassGating?: boolean): Promise<DosSignalR
   }
   return response.json();
 }
+
+// ---------------------------------------------------------------------------
+// Backtest types
+// ---------------------------------------------------------------------------
+
+export interface EquityPoint {
+  trade_date: string;
+  cumulative_pnl: number;
+}
+
+export interface BacktestTrade {
+  trade_date: string;
+  day_type: string;
+  option_side: string;
+  strike: number;
+  entry_price: number;
+  exit_price: number;
+  exit_reason: string;
+  pnl: number;
+}
+
+export interface BacktestError {
+  trade_date: string;
+  error: string;
+}
+
+export interface BacktestSummary {
+  total_trades_attempted: number;
+  successful_trades: number;
+  failed_trades: number;
+  win_rate_pct: number | null;
+  avg_pnl: number | null;
+  total_pnl: number;
+  initial_sl_hit_rate_pct: number | null;
+  equity_curve: EquityPoint[];
+  trades: BacktestTrade[];
+  errors: BacktestError[];
+}
+
+export async function runBacktest(
+  startDate: string = "2024-02-07",
+  weeks: number = 4
+): Promise<BacktestSummary> {
+  const response = await fetch(`${API_BASE_URL}/api/dos/backtest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ start_date: startDate, weeks }),
+  });
+  if (!response.ok) {
+    throw new Error(`Backtest failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+

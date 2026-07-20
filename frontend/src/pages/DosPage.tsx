@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cpu, AlertTriangle, RefreshCw } from "lucide-react";
-import { fetchDosSignal } from "../api/dos";
-import type { DosSignalResponse } from "../api/dos";
+import { Cpu, AlertTriangle, RefreshCw, FlaskConical } from "lucide-react";
+import { fetchDosSignal, runBacktest } from "../api/dos";
+import type { DosSignalResponse, BacktestSummary } from "../api/dos";
 import { SuperTrendSignalPanel } from "../components/dos/SuperTrendChart";
 import { StopLossMonitor } from "../components/dos/StopLossMonitor";
+import { BacktestResults } from "../components/dos/BacktestResults";
 
 export const DosPage: React.FC = () => {
   const [data, setData] = useState<DosSignalResponse | null>(null);
@@ -12,6 +13,11 @@ export const DosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [bypassGating, setBypassGating] = useState<boolean>(false);
+
+  // Backtest state
+  const [backtestResult, setBacktestResult] = useState<BacktestSummary | null>(null);
+  const [backtestLoading, setBacktestLoading] = useState<boolean>(false);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +53,19 @@ export const DosPage: React.FC = () => {
       clearInterval(interval);
     };
   }, [bypassGating]);
+
+  const handleRunBacktest = useCallback(async () => {
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const summary = await runBacktest("2024-02-07", 4);
+      setBacktestResult(summary);
+    } catch (err: any) {
+      setBacktestError(err.message ?? "Backtest request failed.");
+    } finally {
+      setBacktestLoading(false);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -276,6 +295,62 @@ export const DosPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Historical Backtest Section — always visible, not gated           */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="border-t border-zinc-800 pt-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FlaskConical className="h-5 w-5 text-indigo-400" />
+              <div>
+                <h3 className="text-base font-bold tracking-tight text-zinc-100">Historical Backtest</h3>
+                <p className="text-xs text-zinc-500 font-mono mt-0.5">
+                  Feb 2024 · 4 weekly expiries · EOD Bhavcopy · no look-ahead bias
+                </p>
+              </div>
+            </div>
+            <button
+              id="run-backtest-btn"
+              onClick={handleRunBacktest}
+              disabled={backtestLoading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all duration-150 shadow-lg shadow-indigo-900/30"
+            >
+              {backtestLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Running…
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="h-4 w-4" />
+                  Run Backtest
+                </>
+              )}
+            </button>
+          </div>
+
+          {backtestError && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">Backtest Failed</p>
+                <p className="text-xs text-red-400/80">{backtestError}</p>
+              </div>
+            </div>
+          )}
+
+          {backtestLoading && !backtestResult && (
+            <div className="flex items-center gap-3 text-zinc-500 text-sm font-mono py-8 justify-center">
+              <RefreshCw className="h-5 w-5 animate-spin text-indigo-400" />
+              Fetching NSE Bhavcopy data &amp; computing trades…
+            </div>
+          )}
+
+          {backtestResult && !backtestLoading && (
+            <BacktestResults summary={backtestResult} />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -10,14 +10,18 @@ an intentional banner, not a blank/broken panel (this matters because an
 evaluator may open the DOS screen on any day of the week).
 """
 
-from datetime import datetime, time
+from datetime import date, datetime, time, timedelta
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yfinance as yf
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from core.supertrend import calculate_supertrend, get_current_signal
+from core.backtester import run_backtest
+from services.bhavcopy import BhavcopyFetchError
 try:
     from .market_data import get_greeks
 except ImportError:
@@ -302,3 +306,115 @@ def get_dos_signal(bypass_gating: bool = False):
         "open_trade": open_trade_response,
         **signal,
     }
+
+
+# ---------------------------------------------------------------------------
+# Backtest endpoint
+# ---------------------------------------------------------------------------
+
+class BacktestRequest(BaseModel):
+    start_date: Optional[str] = "2024-02-07"  # YYYY-MM-DD; our validated known-good window
+    weeks: Optional[int] = 4
+
+
+def _generate_expiry_dates(start_date: date, weeks: int) -> list[date]:
+    """
+    Generates `weeks` consecutive Wednesday-spaced dates starting from
+    start_date (adding 7 days each time).
+
+    Calendar-quirk correction: if a generated date turns out to have no
+    Bhavcopy data (BhavcopyFetchError about a missing expiry, not a network
+    error), run_backtest will report it in errors[]. The endpoint then retries
+    that date +1 day once — this silently handles leap-year boundary shifts
+    (e.g. 2024-02-28 → 2024-02-29) and similar one-off calendar anomalies
+    without hardcoding any specific dates.
+    """
+    return [start_date + timedelta(weeks=i) for i in range(weeks)]
+
+
+@router.post("/api/dos/backtest")
+def run_dos_backtest(req: BacktestRequest):
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        start = date.fromisoformat(req.start_date)
+    except (ValueError, TypeError) as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail=f"Invalid start_date '{req.start_date}': {e}")
+
+    dates = _generate_expiry_dates(start, req.weeks)
+
+    # First pass — run with the generated dates as-is
+    summary = run_backtest(dates)
+
+    # Calendar-quirk correction: for any date that errored with a missing-expiry
+    # Bhavcopy message, retry with date+1 and splice the result in.
+    corrected_errors = []
+    for err_entry in summary["errors"]:
+        err_msg = err_entry.get("error", "")
+        failed_date = date.fromisoformat(err_entry["trade_date"])
+        # Only retry for missing-data errors, not network failures
+        if "No BANKNIFTY rows" in err_msg or "Available expiries" in err_msg:
+            retry_date = failed_date + timedelta(days=1)
+            logger.info(
+                f"Backtest: retrying {failed_date} as {retry_date} "
+                f"(calendar-quirk correction)"
+            )
+            retry_summary = run_backtest([retry_date])
+            if retry_summary["successful_trades"] > 0:
+                # Merge the recovered trade into the main summary
+                summary["trades"].extend(retry_summary["trades"])
+                summary["successful_trades"] += retry_summary["successful_trades"]
+                summary["failed_trades"] -= 1  # no longer a failure
+                # Recompute derived stats with the full successful set
+                all_pnls = [t["pnl"] for t in summary["trades"]]
+                total_pnl = sum(all_pnls)
+                wins = [p for p in all_pnls if p > 0]
+                sl_hits = [t for t in summary["trades"] if t["exit_reason"] == "initial_sl"]
+                n = len(all_pnls)
+                summary["total_pnl"] = round(total_pnl, 2)
+                summary["avg_pnl"] = round(total_pnl / n, 2) if n else None
+                summary["win_rate_pct"] = round(100 * len(wins) / n, 1) if n else None
+                summary["initial_sl_hit_rate_pct"] = round(100 * len(sl_hits) / n, 1) if n else None
+                # Rebuild equity curve in date order
+                all_trades_sorted = sorted(summary["trades"], key=lambda t: t["trade_date"])
+                running = 0.0
+                summary["equity_curve"] = []
+                for t in all_trades_sorted:
+                    running += t["pnl"]
+                    summary["equity_curve"].append({
+                        "trade_date": t["trade_date"],
+                        "cumulative_pnl": running,
+                    })
+            else:
+                corrected_errors.append(err_entry)  # retry also failed, keep original error
+        else:
+            corrected_errors.append(err_entry)
+
+    summary["errors"] = corrected_errors
+
+    # Persist successful trades to Supabase with is_backtest=True
+    if supabase_client is not None and summary["trades"]:
+        try:
+            rows = [
+                {
+                    "trade_date": t["trade_date"],
+                    "day_type": t["day_type"],
+                    "option_type": t["option_side"],   # matches live schema column name
+                    "strike": t["strike"],
+                    "entry_premium": t["entry_price"],
+                    "exit_premium": t["exit_price"],
+                    "exit_reason": t["exit_reason"],
+                    "pnl": t["pnl"],
+                    "is_backtest": True,
+                }
+                for t in summary["trades"]
+            ]
+            supabase_client.table("dos_trades").insert(rows).execute()
+            logger.info(f"Backtest: persisted {len(rows)} trade(s) to dos_trades")
+        except Exception as e:
+            # Graceful degradation — log but don't fail the response
+            logger.warning(f"Backtest: Supabase persistence failed (summary still returned): {e}")
+
+    return summary
