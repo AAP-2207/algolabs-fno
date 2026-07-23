@@ -84,19 +84,29 @@ def compute_initial_sl_price(entry_premium: float, day_type: DayType) -> float:
     return entry_premium * multiplier
 
 
+def check_trailing_sl(current_underlying_close: float, st_ce_value: float, st_pe_value: float) -> tuple[bool, float]:
+    """
+    Spec rule: Trailing SL triggers when price closes above the ST value of the short CE or PE, whichever is lower.
+    Returns (is_triggered, lower_st_level).
+    """
+    lower_st = min(st_ce_value, st_pe_value)
+    return current_underlying_close > lower_st, lower_st
+
+
 def check_exit_condition(
     open_trade: OpenTrade,
     current_premium: float,
-    trend_just_flipped_against_position: bool,
-    now: datetime,
+    trend_just_flipped_against_position: bool = False,
+    now: Optional[datetime] = None,
+    current_underlying_close: Optional[float] = None,
+    st_ce_value: Optional[float] = None,
+    st_pe_value: Optional[float] = None,
 ) -> tuple[bool, Optional[ExitReason]]:
     """
     Returns (should_exit, reason). Checks conditions in the order the
     spec implies priority: initial SL first (hard risk limit), then
-    trailing SL, then default market-close exit. Whichever is true first
-    is the one that "hit" — in a real system these could tie on the same
-    tick, but checking in this fixed order keeps behavior deterministic
-    and testable.
+    trailing SL (closes above min(st_ce, st_pe) or trend flip), then
+    default market-close exit.
     """
     initial_sl_price = compute_initial_sl_price(
         open_trade["entry_premium"], open_trade["day_type"]
@@ -105,13 +115,18 @@ def check_exit_condition(
     if current_premium >= initial_sl_price:
         return True, "initial_sl"
 
-    if trend_just_flipped_against_position:
+    if current_underlying_close is not None and st_ce_value is not None and st_pe_value is not None:
+        trailing_hit, _ = check_trailing_sl(current_underlying_close, st_ce_value, st_pe_value)
+        if trailing_hit:
+            return True, "trailing_sl"
+    elif trend_just_flipped_against_position:
         return True, "trailing_sl"
 
-    if now.time() >= MARKET_CLOSE_TIME:
+    if now and now.time() >= MARKET_CLOSE_TIME:
         return True, "market_close"
 
     return False, None
+
 
 
 def compute_pnl(

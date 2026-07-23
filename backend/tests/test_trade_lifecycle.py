@@ -154,3 +154,46 @@ def test_compute_pnl_loss_when_premium_rises():
     pnl = compute_pnl(entry_premium=150.0, exit_premium=220.0, quantity=30)
     assert pnl == pytest.approx((150.0 - 220.0) * 30)
     assert pnl < 0
+
+
+def test_trailing_sl_whichever_is_lower():
+    """
+    Spec: Trailing SL triggers when price closes above the ST value of the short CE or PE, whichever is lower.
+    Construct fake CE-ST = 52100 and PE-ST = 51900.
+    Lower ST is 51900.
+    1. Price 51850 (below lower_st 51900) -> NO trigger.
+    2. Price 52000 (above lower_st 51900, below higher_st 52100) -> TRIGGERS trailing SL.
+    3. Price 52200 (above both) -> TRIGGERS trailing SL.
+    """
+    from core.trade_lifecycle import check_trailing_sl
+
+    st_ce = 52100.0
+    st_pe = 51900.0
+
+    # 1. Price below lower ST
+    triggered, lower_st = check_trailing_sl(current_underlying_close=51850.0, st_ce_value=st_ce, st_pe_value=st_pe)
+    assert lower_st == 51900.0
+    assert triggered is False
+
+    # 2. Price above lower ST (51900) but below higher ST (52100)
+    triggered, lower_st = check_trailing_sl(current_underlying_close=52000.0, st_ce_value=st_ce, st_pe_value=st_pe)
+    assert lower_st == 51900.0
+    assert triggered is True
+
+    # 3. Price above both ST values
+    triggered, lower_st = check_trailing_sl(current_underlying_close=52200.0, st_ce_value=st_ce, st_pe_value=st_pe)
+    assert lower_st == 51900.0
+    assert triggered is True
+
+    # Verify integration with check_exit_condition
+    trade = {
+        "strike": 52000, "option_side": "CE", "entry_premium": 150.0,
+        "entry_time": "2026-07-15T10:00:00+05:30", "day_type": "wednesday",
+    }
+    # Price = 52000 (above lower_st 51900)
+    should_exit, reason = check_exit_condition(
+        trade, current_premium=160.0,
+        current_underlying_close=52000.0, st_ce_value=st_ce, st_pe_value=st_pe
+    )
+    assert should_exit is True
+    assert reason == "trailing_sl"

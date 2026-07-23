@@ -356,17 +356,22 @@ class BacktestRequest(BaseModel):
 
 def _generate_expiry_dates(start_date: date, weeks: int) -> list[date]:
     """
-    Generates `weeks` consecutive Wednesday-spaced dates starting from
-    start_date (adding 7 days each time).
-
-    Calendar-quirk correction: if a generated date turns out to have no
-    Bhavcopy data (BhavcopyFetchError about a missing expiry, not a network
-    error), run_backtest will report it in errors[]. The endpoint then retries
-    that date +1 day once — this silently handles leap-year boundary shifts
-    (e.g. 2024-02-28 → 2024-02-29) and similar one-off calendar anomalies
-    without hardcoding any specific dates.
+    Generates both Wednesday and Thursday expiry dates for each of the `weeks`
+    consecutive weeks starting from start_date (resulting in 2 * weeks total expiry days).
     """
-    return [start_date + timedelta(weeks=i) for i in range(weeks)]
+    dates = []
+    # If start_date is not Wednesday (weekday != 2), find the Wednesday of that week
+    wed_offset = (2 - start_date.weekday()) % 7
+    base_wed = start_date + timedelta(days=wed_offset)
+
+    for i in range(weeks):
+        wed = base_wed + timedelta(weeks=i)
+        thu = wed + timedelta(days=1)
+        dates.append(wed)
+        dates.append(thu)
+
+    return dates
+
 
 
 @router.post("/api/dos/backtest")
