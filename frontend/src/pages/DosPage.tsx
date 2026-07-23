@@ -187,14 +187,18 @@ export const DosPage: React.FC = () => {
             {/* Right Column: Execution Recommendations & Option Details */}
             <div className="space-y-6">
               {data.open_trade && (() => {
-                const isBreached = (data.open_trade.current_premium ?? 0) >= data.open_trade.initial_sl_price;
-                const breachReason = isBreached ? "initial" : null;
+                const isInitialBreached = (data.open_trade.current_premium ?? 0) >= data.open_trade.initial_sl_price;
+                const isTrailingBreached = !!data.just_flipped;
+                const isBreached = isInitialBreached || isTrailingBreached;
+                const breachReason = isInitialBreached ? "initial" : (isTrailingBreached ? "trailing" : null);
                 return (
                   <StopLossMonitor
                     entryPremium={data.open_trade.entry_premium}
                     currentPremium={data.open_trade.current_premium ?? 0}
                     initialSlLevel={data.open_trade.initial_sl_price}
-                    trailingSlLevel={null}
+                    currentUnderlying={data.close ?? 0}
+                    supertrendTriggerLevel={data.supertrend_value ?? 0}
+                    trailingSlTriggered={!!data.just_flipped}
                     dayType={data.open_trade.day_type as "wednesday" | "thursday"}
                     isBreached={isBreached}
                     breachReason={breachReason}
@@ -234,6 +238,14 @@ export const DosPage: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Trade Interpretation Card */}
+                  {data.trade_card_text && (
+                    <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-400 leading-relaxed">
+                      <span className="font-semibold block text-indigo-400 text-xs uppercase tracking-wider mb-1 font-mono">Active Position Summary</span>
+                      {data.trade_card_text}
+                    </div>
+                  )}
 
                   {/* Options Data Availability Alert */}
                   {!data.strike_data_available && (

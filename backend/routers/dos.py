@@ -295,17 +295,54 @@ def get_dos_signal(bypass_gating: bool = False):
                     "initial_sl_price": initial_sl_price,
                     "unrealized_pnl": unrealized_pnl
                 }
+
         except Exception as e:
             logger.error(f"DOS Trade Lifecycle: DB operation failed: {e}", exc_info=True)
             open_trade_response = None
 
-    return {
+    # If bypass_gating is on and no real trade was found/set, inject a mock trade for demo purposes
+    if bypass_gating and open_trade_response is None:
+        from core.trade_lifecycle import compute_initial_sl_price as _compute_sl
+        recommended_strike = signal.get("recommended_strike") or 52000
+        option_side = signal.get("option_side") or "CE"
+        ltp_val = signal.get("ltp") or 120.0
+        entry_premium = round(ltp_val * 1.15, 2)
+        initial_sl_price = _compute_sl(entry_premium, "wednesday")
+        open_trade_response = {
+            "strike": int(recommended_strike),
+            "option_side": option_side,
+            "entry_premium": entry_premium,
+            "entry_time": now.isoformat(),
+            "day_type": "wednesday",
+            "current_premium": ltp_val,
+            "initial_sl_price": initial_sl_price,
+            "unrealized_pnl": round((entry_premium - ltp_val) * 30, 2)
+        }
+
+    response_data = {
         "active": True,
         "timestamp": now.isoformat(),
         "candles": chart_candles,
         "open_trade": open_trade_response,
         **signal,
     }
+
+    if open_trade_response is not None:
+        try:
+            from core.interpretation import generate_dos_trade_card
+            response_data["trade_card_text"] = generate_dos_trade_card({
+                "option_side": open_trade_response["option_side"],
+                "strike": open_trade_response["strike"],
+                "day_type": open_trade_response["day_type"],
+                "entry_premium": open_trade_response["entry_premium"],
+                "current_premium": open_trade_response.get("current_premium"),
+                "is_open": True,
+                "exit_reason": None,
+            })
+        except Exception as e:
+            logger.error(f"Failed to generate trade card text: {e}")
+
+    return response_data
 
 
 # ---------------------------------------------------------------------------
@@ -418,3 +455,28 @@ def run_dos_backtest(req: BacktestRequest):
             logger.warning(f"Backtest: Supabase persistence failed (summary still returned): {e}")
 
     return summary
+
+
+@router.get("/api/dos/trades")
+def get_dos_trades(limit: int = 50, is_backtest: Optional[bool] = None):
+    """Fetch persisted trade log from Supabase `dos_trades` table."""
+    if supabase_client is None:
+        return {"trades": [], "source": "mock", "count": 0}
+
+    try:
+        query = supabase_client.table("dos_trades").select("*").order("created_at", desc=True).limit(limit)
+        if is_backtest is not None:
+            query = query.eq("is_backtest", is_backtest)
+
+        res = query.execute()
+        trades = res.data if res and res.data else []
+        return {
+            "trades": trades,
+            "source": "supabase",
+            "count": len(trades)
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error fetching dos_trades: {e}")
+        return {"trades": [], "source": "error", "error": str(e), "count": 0}
+

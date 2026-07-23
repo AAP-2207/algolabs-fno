@@ -68,6 +68,15 @@ The platform uses a hybrid architecture designed to serve fresh data while grace
 
 ---
 
+### Screen Breakdown
+
+1. **Option Chain (`/chain`)**: Interactive real-time option chain table for Nifty with strike prices, LTP, OI, IV, Put-Call Ratio (PCR) commentary card, Max Pain commentary card, and freshness badge (`fetched_at`, `age_minutes`).
+2. **Greeks & Pricing (`/greeks`)**: Displays all 4 Black-Scholes Greeks (Delta, Gamma, Theta, Vega) per strike, computed IV vs NSE IV, and a 2D IV smile curve chart across strikes for the active expiry.
+3. **P&L Decomposer (`/pnl`)**: Interactive form allowing custom position entry (strike, CE/PE, buy/sell, quantity, price, spot move, elapsed time, IV shift) with a waterfall chart decomposing total P&L into Delta, Gamma, Theta, Vega, and residual contributions.
+4. **DOS Strategy Panel (`/dos`)**: Live SuperTrend 5-minute indicator chart, active/inactive gating banner (Wednesday & Thursday > 9:20 AM IST), strike auto-selector with full Greeks + IV, initial and trailing stop-loss visual monitor, 4-week historical backtester UI, and automated plain-language trade cards.
+
+---
+
 ## Setup Instructions
 
 ### Environment Variables
@@ -80,6 +89,7 @@ SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 NSE_API_BASE_URL=https://www.nseindia.com
 PORT=8000
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
 **Frontend (`frontend/.env`)**:
@@ -93,7 +103,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/algolabs-fno.git
+   git clone https://github.com/armando/algolabs-fno.git
    cd algolabs-fno
    ```
 
@@ -119,6 +129,14 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    npm run dev
    ```
 
+4. **Setup Local Poller (Optional - for Live NSE Data Ingestion)**
+   To populate Supabase with live option chain snapshots from a local residential IP:
+   ```bash
+   cd backend
+   python scripts/poller.py
+   # Or set up as a scheduled task / cron job running every 1-5 minutes
+   ```
+
 ---
 
 ## Known Limitations
@@ -127,21 +145,17 @@ This section documents deliberate scope decisions and real infrastructure constr
 
 ### Live NSE Option Chain Data
 
-**Status: Falls back to realistic mock data. Live fetch is blocked by NSE's bot protection.**
+**Status: Sourced via local residential IP poller writing to Supabase; falls back to realistic mock data if unpolled. Direct live fetch from cloud IPs (Render) is blocked by NSE's Akamai bot protection.**
 
 During development, the live NSE option-chain API (`www.nseindia.com`) was found to be blocked at the network/transport layer by NSE's Akamai-based bot protection — confirmed through direct testing, not assumed:
 
-- Requests using Python's `requests` library returned `403 Forbidden` consistently, across multiple distinct networks (home broadband, mobile hotspot), ruling out a simple IP-based rate limit.
-- A direct browser visit to the same URL, from the same machine, at the same time, loaded successfully — confirming the block is not network- or account-based, but specific to how automated (non-browser) HTTP clients are fingerprinted at the TLS/connection level.
-- The response headers (`Server: AkamaiGHost`, `cdn-cache: HIT`) indicate the block is served from Akamai's CDN edge layer before NSE's own application logic — and before the legitimate session cookies (`nsit`, `nseappid`) needed for the API are ever issued.
+- Requests using Python's `requests` library returned `403 Forbidden` consistently, across multiple distinct cloud networks (Render, GitHub Actions), ruling out a simple IP-based rate limit.
+- A direct browser visit or residential IP request to the same URL loaded successfully — confirming the block is specific to datacenter/cloud IP ranges and automated non-browser TLS handshakes.
+- **Engineering decision:** a local residential IP poller writes fresh snapshots to Supabase `option_chain_snapshots`. The deployed backend reads the latest snapshot from Supabase, returning honest timestamps (`fetched_at`, `age_minutes`, `source`) to the user.
 
-**Engineering decision:** rather than pursue browser-fingerprint spoofing to defeat this protection (a real technical path exists, but amounts to deliberately circumventing a security system NSE actively maintains), this project uses a documented, honestly-labeled fallback instead:
+### 2D Volatility Smile vs 3D Volatility Surface
 
-- The backend attempts a live fetch on every request.
-- On failure, it falls back to **realistic simulated data**: mock option premiums are computed using the same validated Black-Scholes engine (`core/bsm.py`) used everywhere else in this project, anchored to the **real, live Bank Nifty/Nifty spot price** (fetched via `yfinance`, which is unaffected by this block), with realistic tick-to-tick fluctuation and open-interest distribution shaped realistically around the at-the-money strike.
-- Every API response includes a `source` field (`"live"` or `"mock"`) and a freshness timestamp, so the frontend — and anyone inspecting the API — always knows exactly which mode is active. Nothing is silently faked.
-
-**What is NOT affected by this:** Bhav Copy (historical data used by the backtester) and `yfinance` (spot prices, historical candles, SuperTrend calculations) are served from different NSE infrastructure entirely and were confirmed working reliably throughout development, including from the deployed Render backend.
+The platform renders a 2D IV smile curve across strike prices for the single active expiry (as explicitly allowed by the assignment specification fallback), rather than a multi-expiry 3D volatility surface.
 
 ### Bank Nifty Weekly Options — Discontinued Nov 2024
 
@@ -168,7 +182,7 @@ The 4-week backtest sample (the assignment's minimum requirement) happened to sh
 
 ## Testing
 
-The project has a comprehensive automated test suite consisting of **62** unit and integration tests.
+The project has a comprehensive automated test suite consisting of **77** unit and integration tests.
 To run the test suite:
 ```bash
 cd backend
@@ -176,8 +190,10 @@ cd backend
 ```
 
 The test coverage spans:
-- **Mathematical Core**: Validation of Black-Scholes pricing options formula (`core/bsm.py`) and Greek values.
-- **SuperTrend Validation**: Verifies ATR and indicator generation logic matches TradingView expectations.
-- **Trade Lifecycle**: Evaluates trade entry signals, stop-loss calculations, trailing stop-losses, and market-close exits.
+- **Mathematical Core**: Validation of Black-Scholes pricing options formula (`core/bsm.py`) and Greek values (Delta, Gamma, Theta, Vega via Brent's method IV solver).
+- **SuperTrend Validation**: Verifies ATR (Wilder's RMA) and indicator generation logic matches TradingView expectations.
+- **Trade Lifecycle**: Evaluates trade entry signals, stop-loss calculations (50% Wed / 100% Thu), trailing stop-losses, and market-close exits.
 - **Bhavcopy Parsing**: Confirms schema structures, zip extractions, and data validation rules for NSE Bhavcopy.
 - **Backtester Logic**: Validates that historical daily replays execute, accumulate P&L metrics, and catch potential data anomalies without lookahead bias.
+- **API Endpoints**: Validates `/health`, `/api/option-chain`, `/api/greeks`, `/api/pnl-decompose`, `/api/dos/signal`, `/api/dos/backtest`, and `/api/dos/trades`.
+

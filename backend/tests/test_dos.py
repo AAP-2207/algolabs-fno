@@ -91,3 +91,15 @@ def test_reason_names_actual_weekday():
 
     active, reason = is_dos_active(FRIDAY)
     assert "Friday" in reason
+
+
+def test_get_dos_trades_endpoint():
+    from fastapi.testclient import TestClient
+    from main import app
+    client = TestClient(app)
+    response = client.get("/api/dos/trades")
+    assert response.status_code == 200
+    data = response.json()
+    assert "trades" in data
+    assert "source" in data
+

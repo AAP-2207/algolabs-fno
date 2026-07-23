@@ -40,6 +40,7 @@ export interface DosSignalResponse {
   vega?: number | null;
   candles?: CandleData[];
   open_trade?: OpenTradeData | null;
+  trade_card_text?: string;
 }
 
 /**

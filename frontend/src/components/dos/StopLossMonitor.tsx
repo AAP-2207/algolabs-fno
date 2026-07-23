@@ -32,7 +32,9 @@ export interface StopLossMonitorProps {
   entryPremium: number;
   currentPremium: number;
   initialSlLevel: number;
-  trailingSlLevel: number | null;
+  currentUnderlying: number;
+  supertrendTriggerLevel: number;
+  trailingSlTriggered: boolean;
   dayType: 'wednesday' | 'thursday';
   isBreached: boolean;
   breachReason: 'initial' | 'trailing' | null;
@@ -43,7 +45,9 @@ export const StopLossMonitor: React.FC<StopLossMonitorProps> = ({
   entryPremium,
   currentPremium,
   initialSlLevel,
-  trailingSlLevel,
+  currentUnderlying,
+  supertrendTriggerLevel,
+  trailingSlTriggered,
   dayType,
   isBreached,
   breachReason,
@@ -136,22 +140,42 @@ export const StopLossMonitor: React.FC<StopLossMonitorProps> = ({
       {/* Gradient Gauge component */}
       <GradientGauge percentage={pctToSl} />
 
-      {/* Breached alert view with Fix 2: null-safe trailingSlLevel fallback */}
+      {/* Trailing SL Section */}
+      <div className="bg-zinc-950/40 p-4 rounded-lg border border-zinc-900/60 flex items-center justify-between text-xs">
+        <div className="space-y-1">
+          <span className="block text-[10px] text-zinc-500 uppercase font-semibold font-mono">Trailing SL (SuperTrend)</span>
+          <div className="text-zinc-200 font-mono">
+            Current: <span className="font-semibold text-zinc-300">{currentUnderlying.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</span> | Trigger: <span className="font-semibold text-zinc-300">{supertrendTriggerLevel.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</span>
+          </div>
+        </div>
+        <div>
+          {trailingSlTriggered ? (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-950/60 text-red-400 border border-red-900/60">
+              TRIGGERED
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-900/60">
+              ARMED
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Breached alert view */}
       {isBreached && (
         <div className="bg-red-950/20 border border-red-900/50 rounded-lg p-3 text-xs text-red-400 space-y-1">
           <p className="font-semibold">
             🚨 Trade Stopped Out
           </p>
           <p>
-            Triggered at price: <span className="font-mono font-semibold">{(breachReason === 'initial' ? initialSlLevel : (trailingSlLevel ?? 0)).toFixed(2)}</span> ({breachReason} SL)
+            Triggered via: <span className="font-mono font-semibold uppercase">{breachReason} SL</span>
+            {breachReason === 'initial' && (
+              <> (at premium level <span className="font-mono font-semibold">₹{initialSlLevel.toFixed(2)}</span>)</>
+            )}
+            {breachReason === 'trailing' && (
+              <> (underlying crossed SuperTrend at <span className="font-mono font-semibold">{supertrendTriggerLevel.toFixed(1)}</span>)</>
+            )}
           </p>
-        </div>
-      )}
-
-      {/* Trailing SL placeholder check */}
-      {trailingSlLevel !== null && (
-        <div className="text-[10px] text-zinc-500 italic">
-          Trailing SL Gauge active at {(trailingSlLevel ?? 0).toFixed(2)}
         </div>
       )}
     </div>
