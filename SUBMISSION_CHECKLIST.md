@@ -282,7 +282,7 @@ def test_generate_expiry_dates_no_duplicates():
 
 ### Issue 3: Commit Hash & Checklist Consistency
 - **Fix & Single Atomic Commit**: All code fixes, test additions, and `SUBMISSION_CHECKLIST.md` will be committed together after final review.
-- **True Final Commit Hash**: PENDING - to be filled in after final commit, see instructions.
+- **True Final Commit Hash**: 9141c4d9073ada5729f9ee625a0c81ded85fdb63.
 
 ### Issue 4: P&L Decomposer Residual with Self-Consistent Inputs
 - **Original Flag**: Manual demo used arbitrary hand-typed `entry_price=150` and `current_price=180` producing a large residual.
