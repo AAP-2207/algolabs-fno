@@ -318,7 +318,7 @@ export const DosPage: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold tracking-tight text-zinc-100">Historical Backtest</h3>
                 <p className="text-xs text-zinc-500 font-mono mt-0.5">
-                  Feb 2024 · 4 weekly expiries · EOD Bhavcopy · no look-ahead bias
+                  Jan–Feb 2024 · 8 weekly expiries · EOD Bhavcopy · no look-ahead bias
                 </p>
               </div>
             </div>
