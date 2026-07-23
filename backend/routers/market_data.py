@@ -70,16 +70,20 @@ def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asse
                         age_minutes = (current_time - fetched_dt).total_seconds() / 60.0
                     except Exception as parse_err:
                         logger.error(f"Error parsing fetched_at '{fetched_at}': {parse_err}")
-                        age_minutes = 0.0
-                    
-                    logger.info(f"Serving option chain from Supabase snapshot fetched at {fetched_at} ({age_minutes:.2f} minutes old).")
-                    
-                    return {
-                        "data": data,
-                        "fetched_at": fetched_at,
-                        "source": "live-polled",
-                        "age_minutes": age_minutes
-                    }
+                        age_minutes = 999.0
+
+                    # Check if snapshot is reasonably fresh (<= 60 mins) and contains strike records
+                    records_data = data.get("records", {}).get("data", []) if isinstance(data, dict) else []
+                    if age_minutes <= 60.0 and len(records_data) >= 3:
+                        logger.info(f"Serving option chain from Supabase snapshot fetched at {fetched_at} ({age_minutes:.2f} minutes old).")
+                        return {
+                            "data": data,
+                            "fetched_at": fetched_at,
+                            "source": "live-polled",
+                            "age_minutes": age_minutes
+                        }
+                    else:
+                        logger.warning(f"Supabase snapshot for {symbol_upper} is stale ({age_minutes:.1f}m old > 60m threshold) or has incomplete strikes ({len(records_data)} strikes). Falling back to fresh nse_client data.")
                 else:
                     logger.warning("Found record in Supabase, but 'data' column is not a JSON object.")
             else:
@@ -87,7 +91,7 @@ def get_option_chain(symbol: str = Query("NIFTY", description="Option chain asse
         except Exception as e:
             logger.error(f"Error querying Supabase for symbol {symbol_upper}: {str(e)}. Falling back to direct fetch.")
             
-    # Last-resort fallback
+    # Last-resort fallback to fresh nse_client mock data
     logger.info(f"Falling back to direct fetch for symbol {symbol_upper}...")
     nse_data = nse_client.get_option_chain(symbol_upper)
     return {
@@ -155,7 +159,6 @@ def get_greeks(symbol: str = Query("NIFTY", description="Option chain symbol (e.
                 chain_data = record.get("data")
                 fetched_at = record.get("fetched_at")
                 if isinstance(chain_data, dict):
-                    source = "live-polled"
                     try:
                         fetched_dt = datetime.datetime.fromisoformat(fetched_at)
                         if fetched_dt.tzinfo is None:
@@ -163,7 +166,14 @@ def get_greeks(symbol: str = Query("NIFTY", description="Option chain symbol (e.
                         age_minutes = (current_time - fetched_dt).total_seconds() / 60.0
                     except Exception as parse_err:
                         logger.error(f"Error parsing fetched_at '{fetched_at}': {parse_err}")
-                        age_minutes = 0.0
+                        age_minutes = 999.0
+
+                    records_data = chain_data.get("records", {}).get("data", []) if isinstance(chain_data, dict) else []
+                    if age_minutes <= 60.0 and len(records_data) >= 3:
+                        source = "live-polled"
+                    else:
+                        logger.warning(f"Supabase snapshot for Greeks {symbol_upper} is stale ({age_minutes:.1f}m old > 60m) or incomplete. Falling back to fresh nse_client data.")
+                        chain_data = None
                 else:
                     chain_data = None
         except Exception as e:

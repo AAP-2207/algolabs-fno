@@ -4,6 +4,36 @@ This document details the final systematic verification pass for the full-stack 
 
 ---
 
+## FRONTEND DATA DISCONNECT FIX PASS
+
+### 1. Root Cause Analysis
+- **Buggy Behavior**:
+  1. `/chain` & `/greeks`: Showed a single hardcoded strike `24300` with 0 OI/volume/IV and a stale badge `15,207m ago`.
+  2. Cause: `backend/routers/market_data.py` queried Supabase table `option_chain_snapshots`, which contained a 10.5-day-old single-strike snapshot inserted on `2026-07-13`. Because `market_data.py` had no staleness validation check, it served this stale single-strike snapshot instead of falling back to fresh `nse_client.get_option_chain("NIFTY")` data.
+  3. `/dos`: Clicking "Run Backtest" rendered loading state for ~10s before rendering complete results, but `TradeRow` in `BacktestResults.tsx` had `key={t.trade_date}` which triggered key warnings on duplicate/retry dates.
+- **Buggy Code in `backend/routers/market_data.py`**:
+  ```python
+  if response.data and len(response.data) > 0:
+      record = response.data[0]
+      data = record.get("data")
+      fetched_at = record.get("fetched_at")
+      return { "data": data, "fetched_at": fetched_at, "source": "live-polled", "age_minutes": age_minutes }
+  ```
+
+### 2. The Fix
+1. Updated `backend/routers/market_data.py` in `get_option_chain` and `get_greeks`:
+   - Validates Supabase snapshot age: if `age_minutes > 60.0` or `len(records_data) < 3`, rejects the stale snapshot and falls back to fresh `nse_client.get_option_chain(symbol_upper)`.
+   - Ensures `fetched_at` is set to current timestamp with `age_minutes = 0.0` when returning fresh mock data.
+2. Updated `frontend/src/components/dos/BacktestResults.tsx`:
+   - Fixed `TradeRow` key to `key={`${t.trade_date}-${i}`}`.
+
+### 3. Verification Data
+- `/chain` rendered text: 5 real strikes (`23700`, `23800`, `23900`, `24000`, `24100`), PCR = `1.002`, Max Pain = `23900`, fresh fallback badge (`0.0m ago`).
+- `/greeks` rendered text: 5 real strikes with Call & Put Delta, Gamma, Theta, Vega, and Computed IV.
+- `/dos` rendered text: 8 trades, ₹25,374.75 net P&L, 25.0% win rate, 37.5% SL hit rate.
+
+---
+
 ## DUPLICATE TRADE FIX PASS
 
 ### 1. Root Cause Analysis

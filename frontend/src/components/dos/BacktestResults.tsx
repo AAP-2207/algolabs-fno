@@ -271,7 +271,7 @@ export const BacktestResults: React.FC<{ summary: BacktestSummary }> = ({ summar
             </thead>
             <tbody>
               {summary.trades.map((t, i) => (
-                <TradeRow key={t.trade_date} trade={t} index={i} />
+                <TradeRow key={`${t.trade_date}-${i}`} trade={t} index={i} />
               ))}
             </tbody>
           </table>

@@ -58,7 +58,7 @@ export const DosPage: React.FC = () => {
     setBacktestLoading(true);
     setBacktestError(null);
     try {
-      const summary = await runBacktest("2024-02-07", 4);
+      const summary = await runBacktest("2024-01-03", 8);
       setBacktestResult(summary);
     } catch (err: any) {
       setBacktestError(err.message ?? "Backtest request failed.");

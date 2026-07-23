@@ -1,0 +1,100 @@
+{
+  "commit": "1b960c6ba9858bb425d04dea5a8d40448c54a8de",
+  "live_frontend": "https://algolabs-fno.vercel.app",
+  "live_backend": "https://algolabs-fno.onrender.com",
+  "pages": {
+    "chain": {
+      "initial_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nUNDERLYING ASSET\nNIFTY 50\nIndex (NSE: 13-Jul-2026 15:30:00)\nSPOT PRICE\n₹24,350.00\n+112.40 (+0.47%)\nData as of 11:57, 13 Jul (Stale)\n(15221m ago)\nPUT-CALL RATIO (PCR)\n0\n\nSentiment: Bearish (Call writing)\n\nMAX PAIN STRIKE\n24,300\n\nStrike with minimum buyer payout on expiry.\n\nCURRENT EXPIRY\n2026-07-16\n\nWeekly option chain cycle.\n\nDerivatives Option Chain\nCE (Calls)\nPE (Puts)\nCALLS (CE)\tSTRIKE\tPUTS (PE)\nOI (Lakhs)\tChg OI\tVolume\tIV (%)\tLTP\tLTP\tIV (%)\tVolume\tChg OI\tOI (Lakhs)\n\n0\t+0\t0\t0.00\t₹120.00\t24,300\t₹80.00\t0.00\t0\t+0\t\n0",
+      "after_10s_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nUNDERLYING ASSET\nNIFTY 50\nIndex (NSE: 13-Jul-2026 15:30:00)\nSPOT PRICE\n₹24,350.00\n+112.40 (+0.47%)\nData as of 11:57, 13 Jul (Stale)\n(15222m ago)\nPUT-CALL RATIO (PCR)\n0\n\nSentiment: Bearish (Call writing)\n\nMAX PAIN STRIKE\n24,300\n\nStrike with minimum buyer payout on expiry.\n\nCURRENT EXPIRY\n2026-07-16\n\nWeekly option chain cycle.\n\nDerivatives Option Chain\nCE (Calls)\nPE (Puts)\nCALLS (CE)\tSTRIKE\tPUTS (PE)\nOI (Lakhs)\tChg OI\tVolume\tIV (%)\tLTP\tLTP\tIV (%)\tVolume\tChg OI\tOI (Lakhs)\n\n0\t+0\t0\t0.00\t₹120.00\t24,300\t₹80.00\t0.00\t0\t+0\t\n0"
+    },
+    "greeks": {
+      "initial_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nGreeks & Implied Volatility Desk\nData as of 11:57, 13 Jul (Stale)\n(15222m ago)\nVOLATILITY SMILE INTERPRETATION\nIV Levels Normal\n\nAt-the-money IV (19.22%) is well-aligned with the average IV base of 19.22%. The option pricing shows a standard volatility smile distribution with typical skew features, indicating general stability and absence of outsized indexing risks at this moment.\n\nOption Contract Greeks\nCALL GREEKS (CE)\tSTRIKE\tPUT GREEKS (PE)\nComputed IV\tVega\tTheta\tGamma\tDelta\tDelta\tGamma\tTheta\tVega\tComputed IV\n\n17.8%\n\t4.94\t-46.33\t0.0017\t\n0.596\t24300\t\n-0.416\t0.0015\t-49.62\t4.97\t\n20.6%\nIMPLIED VOLATILITY SMILE (NIFTY SKEW)\nCalls (CE IV)Puts (PE IV)\n24300\nStrike Price\n0\n6\n12\n18\n24\nImplied Volatility (%)\n0",
+      "after_10s_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nGreeks & Implied Volatility Desk\nData as of 11:57, 13 Jul (Stale)\n(15222m ago)\nVOLATILITY SMILE INTERPRETATION\nIV Levels Normal\n\nAt-the-money IV (19.22%) is well-aligned with the average IV base of 19.22%. The option pricing shows a standard volatility smile distribution with typical skew features, indicating general stability and absence of outsized indexing risks at this moment.\n\nOption Contract Greeks\nCALL GREEKS (CE)\tSTRIKE\tPUT GREEKS (PE)\nComputed IV\tVega\tTheta\tGamma\tDelta\tDelta\tGamma\tTheta\tVega\tComputed IV\n\n17.8%\n\t4.94\t-46.33\t0.0017\t\n0.596\t24300\t\n-0.416\t0.0015\t-49.62\t4.97\t\n20.6%\nIMPLIED VOLATILITY SMILE (NIFTY SKEW)\nCalls (CE IV)Puts (PE IV)\n24300\nStrike Price\n0\n6\n12\n18\n24\nImplied Volatility (%)\n0"
+    },
+    "pnl": {
+      "initial_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nP&L Greek Decomposer Desk\n1. POSITION CONFIGURATION\nOption Type\nCall (CE)\nPut (PE)\nDirection\nBuy (Long)\nSell (Short)\nStrike Price\nContracts Quantity\nEntry Premium\nCurrent Premium\n2. MARKET SIMULATION\nPrevious Spot Price (S₀)\nCurrent Spot Price (S₁)\nDays Elapsed (dt)\nPrev Days to Expiry (T)\nEntry IV (%)\nCurrent IV (%)\nRun Taylor Decomposer\n\nReady to Decompose\n\nSet option variables and trigger calculations to decompose gains/losses.",
+      "after_10s_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nP&L Greek Decomposer Desk\n1. POSITION CONFIGURATION\nOption Type\nCall (CE)\nPut (PE)\nDirection\nBuy (Long)\nSell (Short)\nStrike Price\nContracts Quantity\nEntry Premium\nCurrent Premium\n2. MARKET SIMULATION\nPrevious Spot Price (S₀)\nCurrent Spot Price (S₁)\nDays Elapsed (dt)\nPrev Days to Expiry (T)\nEntry IV (%)\nCurrent IV (%)\nRun Taylor Decomposer\n\nReady to Decompose\n\nSet option variables and trigger calculations to decompose gains/losses.",
+      "result_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nP&L Greek Decomposer Desk\n1. POSITION CONFIGURATION\nOption Type\nCall (CE)\nPut (PE)\nDirection\nBuy (Long)\nSell (Short)\nStrike Price\nContracts Quantity\nEntry Premium\nCurrent Premium\n2. MARKET SIMULATION\nPrevious Spot Price (S₀)\nCurrent Spot Price (S₁)\nDays Elapsed (dt)\nPrev Days to Expiry (T)\nEntry IV (%)\nCurrent IV (%)\nRun Taylor Decomposer\nPOSITION P&L BREAKDOWN\n\nMost of this trade's P&L came from Delta movement (₹2721.27), with Vega volatility shift contributing ₹1440.99.\n\nCalculated Net P&L\n₹3200.00\nTaylor Series Residual Error\n₹-185.11\nGREEKS CONTRIBUTION WATERFALL (FIRST-ORDER TAYLOR SERIES)\nDelta P&L\nGamma P&L\nTheta P&L\nVega P&L\nResidual\nTotal P&L\n-1500\n0\n1500\n3000\n4500\nP&L Contribution (₹)\n-1500"
+    },
+    "dos": {
+      "initial_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nDOS Strategy Engine\nDOS Strategy Inactive\n\nDOS strategy is only active on Wednesday and Thursday (today is Friday)\n\nGating details: Wednesday and Thursday starting at 9:20 AM IST or later.\nHistorical Backtest\n\nFeb 2024 · 4 weekly expiries · EOD Bhavcopy · no look-ahead bias\n\nRun Backtest",
+      "after_10s_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nDOS Strategy Engine\nDOS Strategy Inactive\n\nDOS strategy is only active on Wednesday and Thursday (today is Friday)\n\nGating details: Wednesday and Thursday starting at 9:20 AM IST or later.\nHistorical Backtest\n\nFeb 2024 · 4 weekly expiries · EOD Bhavcopy · no look-ahead bias\n\nRun Backtest",
+      "backtest_text": "A\nALGOLABS\n\nDERIVATIVES DESK\n\nOption Chain\nLive NSE NIFTY Derivatives\nGreeks & IV\nOption Pricing & Greeks\nP&L Decomposer\nDeconstruct Portfolio risk\nDOS Strategy\nDaily Option Seller Engine\n\nAlgoLabs F&O Platform v1.0.0\n\nResidential poller node active\n\nDOS Strategy Engine\nDOS Strategy Inactive\n\nDOS strategy is only active on Wednesday and Thursday (today is Friday)\n\nGating details: Wednesday and Thursday starting at 9:20 AM IST or later.\nHistorical Backtest\n\nFeb 2024 · 4 weekly expiries · EOD Bhavcopy · no look-ahead bias\n\nRun Backtest\nTOTAL TRADES\n4\n3 succeeded\nWIN RATE\n66.7%\nprofitable days\nTOTAL P&L\n+₹34,028.25\n4 weeks, 1 lot\nAVG P&L / TRADE\n+₹11,342.75\nSL HIT RATE\n33.3%\nof successful trades\nFAILED DAYS\n1\ndata / fetch errors\nEQUITY CURVE\nNet +₹34,028.25\n2024-02-14\n2024-02-21\n2024-02-29\n₹0\n₹9,000\n₹18,000\n₹27,000\n₹36,000\nTRADE LOG\nDATE\tDAY\tCONTRACT\tENTRY\tEXIT\tREASON\tP&L\n2024-02-14\tWEDNESDAY\t47200 PE\t₹2,204.05\t₹1,304.20\tMarket Close\t+₹26,995.50\n2024-02-21\tWEDNESDAY\t47100 PE\t₹108.05\t₹162.08\tSL Hit\t−₹1,620.75\n2024-02-29\tTHURSDAY\t47200 PE\t₹1,402.65\t₹1,114.20\tMarket Close\t+₹8,653.50\nDATA GAPS (1)\n2024-02-07: SuperTrend computation failed: Too Many Requests. Rate limited. Try after a while.\n₹0"
+    }
+  },
+  "backend_responses": {
+    "health": {
+      "status": "ok"
+    },
+    "option_chain": {
+      "data": {
+        "source": "live",
+        "records": {
+          "data": [
+            {
+              "CE": {
+                "lastPrice": 120.0,
+                "strikePrice": 24300,
+                "underlyingValue": 24350.0
+              },
+              "PE": {
+                "lastPrice": 80.0,
+                "strikePrice": 24300,
+                "underlyingValue": 24350.0
+              },
+              "expiryDate": "2026-07-16",
+              "strikePrice": 24300
+            }
+          ],
+          "timestamp": "13-Jul-2026 15:30:00",
+          "expiryDates": [
+            "2026-07-16"
+          ],
+          "underlyingValue": 24350.0
+        }
+      },
+      "fetched_at": "2026-07-13T06:27:41.738312+00:00",
+      "source": "live-polled",
+      "age_minutes": 15222.617811366667
+    },
+    "greeks": {
+      "fetched_at": "2026-07-13T06:27:41.738312+00:00",
+      "source": "live-polled",
+      "age_minutes": 15222.629108383333,
+      "strikes": [
+        {
+          "strike": 24300,
+          "CE": {
+            "delta": 0.5959231891521062,
+            "gamma": 0.0017065764913541718,
+            "theta": -46.32584302888213,
+            "vega": 4.936969632750735,
+            "computed_iv": 17.808593896052017,
+            "nse_iv": 0.0,
+            "ltp": 120.0
+          },
+          "PE": {
+            "delta": -0.4164606692032671,
+            "gamma": 0.0014837099118655379,
+            "theta": -49.61945798189988,
+            "vega": 4.972777033580401,
+            "computed_iv": 20.632170706062023,
+            "nse_iv": 0.0,
+            "ltp": 80.0
+          }
+        }
+      ]
+    },
+    "dos_signal": {
+      "active": false,
+      "reason": "DOS strategy is only active on Wednesday and Thursday (today is Friday)",
+      "timestamp": "2026-07-24T01:40:20.025068+05:30"
+    }
+  },
+  "console_logs": {
+    "chain": [],
+    "greeks": [],
+    "pnl": [],
+    "dos": []
+  }
+}
