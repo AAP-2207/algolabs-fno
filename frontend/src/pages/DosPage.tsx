@@ -89,8 +89,8 @@ export const DosPage: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-6">
-            {/* Simulation Bypass Switch - Only visible in DEV mode */}
-            {import.meta.env.DEV && (
+            {/* Simulation Bypass Switch - Only visible if VITE_SHOW_DEV_CONTROLS env var is explicitly set to "true" */}
+            {import.meta.env.VITE_SHOW_DEV_CONTROLS === "true" && (
               <div className="flex items-center gap-3 bg-zinc-900/50 border border-zinc-850 rounded-xl px-4 py-2 shadow-inner">
                 <span className="text-xs font-semibold font-mono tracking-wide text-zinc-400">Gating Bypass</span>
                 <button

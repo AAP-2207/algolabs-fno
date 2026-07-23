@@ -82,6 +82,20 @@ def fetch_daily_banknifty_history(end_date: date, lookback_days: int = 60) -> pd
     return df
 
 
+def get_weekly_expiry_date(trade_date: date) -> date:
+    """
+    Returns the standard expected weekly expiry date for Bank Nifty options
+    for a given trade_date.
+
+    Historical NSE Bank Nifty weekly expiry schedule:
+    - May 2016 to Sep 3, 2023: Thursday expiry (weekday 3)
+    - Sep 4, 2023 to Nov 20, 2024: Wednesday expiry (weekday 2)
+    """
+    target_weekday = 3 if trade_date < date(2023, 9, 4) else 2
+    days_ahead = (target_weekday - trade_date.weekday()) % 7
+    return trade_date + timedelta(days=days_ahead)
+
+
 def run_single_day_backtest(trade_date: date) -> BacktestTrade:
     """
     Backtests one single expiry day (must be a Wednesday or Thursday, and
@@ -136,7 +150,23 @@ def run_single_day_backtest(trade_date: date) -> BacktestTrade:
     recommended_strike = round(supertrend_value / 100) * 100
 
     try:
-        options_df = get_banknifty_options(trade_date=trade_date, expiry_date=trade_date)
+        # Fetch options for trade_date, then find the nearest active weekly expiry on/after trade_date
+        options_df = get_banknifty_options(trade_date=trade_date, expiry_date=None)
+        available_expiries = sorted(options_df["XpryDt"].dt.date.unique())
+        upcoming_expiries = [exp for exp in available_expiries if exp >= trade_date]
+        if not upcoming_expiries:
+            return BacktestTrade(
+                trade_date=trade_date, day_type=day_type, option_side=option_side,
+                strike=recommended_strike, entry_price=0, exit_price=0, exit_reason="",
+                pnl=0, supertrend_value=supertrend_value,
+                error=f"No active upcoming expiry found in Bhavcopy for {trade_date}",
+            )
+        target_expiry = upcoming_expiries[0]
+        matching = options_df[
+            (options_df["XpryDt"].dt.date == target_expiry) &
+            (options_df["StrkPric"] == recommended_strike) &
+            (options_df["OptnTp"] == option_side)
+        ]
     except BhavcopyFetchError as e:
         return BacktestTrade(
             trade_date=trade_date, day_type=day_type, option_side=option_side,
@@ -145,16 +175,14 @@ def run_single_day_backtest(trade_date: date) -> BacktestTrade:
             error=f"Bhavcopy fetch failed: {e}",
         )
 
-    matching = options_df[
-        (options_df["StrkPric"] == recommended_strike) & (options_df["OptnTp"] == option_side)
-    ]
     if matching.empty:
-        available = sorted(options_df[options_df["OptnTp"] == option_side]["StrkPric"].unique())
+        exp_options = options_df[options_df["XpryDt"].dt.date == target_expiry]
+        available = sorted(exp_options[exp_options["OptnTp"] == option_side]["StrkPric"].unique())
         return BacktestTrade(
             trade_date=trade_date, day_type=day_type, option_side=option_side,
             strike=recommended_strike, entry_price=0, exit_price=0, exit_reason="",
             pnl=0, supertrend_value=supertrend_value,
-            error=f"No {option_side} contract at strike {recommended_strike}. Available: {available}",
+            error=f"No {option_side} contract at strike {recommended_strike} for expiry {target_expiry}. Available: {available}",
         )
 
     opt_row = matching.iloc[0]

@@ -70,3 +70,35 @@ def test_pnl_decompose_with_iv_change():
     # Assert residual error is under 10% of total_pnl (i.e. under 320.0)
     assert abs(data["residual"]) < 320.0
 
+
+def test_pnl_decompose_large_extreme_move_has_large_residual():
+    """
+    Documents known limitation of 1st-order Taylor expansion: for large, extreme moves
+    (e.g., Qty 1000, 800-point spot shift, 14 days elapsed, IV shift), the residual
+    error is large (> 15% of |total_pnl|).
+    """
+    payload = {
+        "strike": 24000.0,
+        "option_type": "CE",
+        "position": "buy",
+        "quantity": 1000,
+        "entry_price": 1200.0,
+        "current_price": 1300.0,
+        "previous_S": 24000.0,
+        "current_S": 24800.0,
+        "days_elapsed": 14.0,
+        "volatility": 0.079,
+        "current_volatility": 0.089,
+        "days_to_expiry": 30.0,
+    }
+    response = client.post("/api/pnl-decompose", json=payload)
+    assert response.status_code == 200
+
+    data = response.json()
+    total_pnl = data["total_pnl"]
+    residual = data["residual"]
+
+    assert total_pnl == 100000.0
+    assert abs(residual) > 0.15 * abs(total_pnl)
+
+

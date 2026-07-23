@@ -407,6 +407,14 @@ export const PnlPage: React.FC = () => {
                     <span>Taylor Series Residual Error</span>
                     <span>₹{result.residual.toFixed(2)}</span>
                   </div>
+                  {Math.abs(result.residual) > 0.15 * Math.abs(result.total_pnl) && (
+                    <div className="bg-amber-950/20 border border-amber-900/50 p-2.5 rounded-lg flex gap-2 items-start text-[11px] text-amber-300/90 mt-1">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        Large residual — first-order approximation is less accurate for big moves; treat this breakdown as directional, not exact.
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
