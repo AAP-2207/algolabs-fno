@@ -358,6 +358,7 @@ def _generate_expiry_dates(start_date: date, weeks: int) -> list[date]:
     """
     Generates both Wednesday and Thursday expiry dates for each of the `weeks`
     consecutive weeks starting from start_date (resulting in 2 * weeks total expiry days).
+    Ensures unique, deduplicated dates.
     """
     dates = []
     # If start_date is not Wednesday (weekday != 2), find the Wednesday of that week
@@ -367,10 +368,12 @@ def _generate_expiry_dates(start_date: date, weeks: int) -> list[date]:
     for i in range(weeks):
         wed = base_wed + timedelta(weeks=i)
         thu = wed + timedelta(days=1)
-        dates.append(wed)
-        dates.append(thu)
+        if wed not in dates:
+            dates.append(wed)
+        if thu not in dates:
+            dates.append(thu)
 
-    return dates
+    return sorted(list(dict.fromkeys(dates)))
 
 
 
@@ -399,6 +402,20 @@ def run_dos_backtest(req: BacktestRequest):
         # Only retry for missing-data errors, not network failures
         if "No BANKNIFTY rows" in err_msg or "Available expiries" in err_msg:
             retry_date = failed_date + timedelta(days=1)
+            
+            # Prevent double-counting if retry_date is already in dates or already in summary["trades"]
+            already_scheduled_or_traded = (
+                retry_date in dates or
+                any(t["trade_date"] == retry_date.isoformat() for t in summary["trades"])
+            )
+            if already_scheduled_or_traded:
+                logger.info(
+                    f"Backtest: skipping retry of {failed_date} as {retry_date} "
+                    f"because {retry_date} is already in backtest schedule/trades"
+                )
+                corrected_errors.append(err_entry)
+                continue
+
             logger.info(
                 f"Backtest: retrying {failed_date} as {retry_date} "
                 f"(calendar-quirk correction)"
@@ -433,6 +450,7 @@ def run_dos_backtest(req: BacktestRequest):
                 corrected_errors.append(err_entry)  # retry also failed, keep original error
         else:
             corrected_errors.append(err_entry)
+
 
     summary["errors"] = corrected_errors
 

@@ -103,3 +103,15 @@ def test_get_dos_trades_endpoint():
     assert "trades" in data
     assert "source" in data
 
+
+def test_generate_expiry_dates_no_duplicates():
+    from datetime import date
+    from routers.dos import _generate_expiry_dates
+
+    for start_str, weeks in [("2024-01-03", 8), ("2024-02-07", 4), ("2024-03-01", 6)]:
+        start_d = date.fromisoformat(start_str)
+        dates = _generate_expiry_dates(start_d, weeks)
+        assert len(dates) == len(set(dates)), f"Duplicates found in _generate_expiry_dates for {start_str}, weeks={weeks}"
+        assert dates == sorted(dates), f"Dates not sorted for {start_str}, weeks={weeks}"
+
+
