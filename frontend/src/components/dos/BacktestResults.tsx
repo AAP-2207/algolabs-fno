@@ -163,8 +163,35 @@ const TradeRow: React.FC<{ trade: BacktestSummary["trades"][number]; index: numb
 // Main component
 // ---------------------------------------------------------------------------
 
+const getWeeksCount = (summary: BacktestSummary): number => {
+  const dateStrs = [
+    ...(summary.equity_curve ?? []).map((p) => p.trade_date),
+    ...(summary.trades ?? []).map((t) => t.trade_date),
+    ...(summary.errors ?? []).map((e) => e.trade_date),
+  ].filter(Boolean);
+
+  if (dateStrs.length === 0) {
+    return summary.total_trades_attempted ? Math.ceil(summary.total_trades_attempted / 2) : 8;
+  }
+
+  const timestamps = dateStrs
+    .map((d) => new Date(d).getTime())
+    .filter((t) => !isNaN(t));
+
+  if (timestamps.length === 0) {
+    return summary.total_trades_attempted ? Math.ceil(summary.total_trades_attempted / 2) : 8;
+  }
+
+  const minTime = Math.min(...timestamps);
+  const maxTime = Math.max(...timestamps);
+  const diffDays = (maxTime - minTime) / (1000 * 60 * 60 * 24);
+
+  return Math.max(1, Math.ceil((diffDays + 1) / 7));
+};
+
 export const BacktestResults: React.FC<{ summary: BacktestSummary }> = ({ summary }) => {
   const totalPnlPositive = summary.total_pnl >= 0;
+  const weeksCount = getWeeksCount(summary);
 
   const fmtRupees = (v: number | null) =>
     v === null
@@ -195,7 +222,7 @@ export const BacktestResults: React.FC<{ summary: BacktestSummary }> = ({ summar
         <StatCard
           label="Total P&L"
           value={fmtRupees(summary.total_pnl)}
-          sub="4 weeks, 1 lot"
+          sub={`${weeksCount} week${weeksCount === 1 ? "" : "s"}, 1 lot`}
           accent={totalPnlPositive ? "green" : "red"}
         />
         <StatCard
