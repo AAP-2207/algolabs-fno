@@ -1,144 +1,184 @@
 # AlgoLabs F&O Derivatives Analytics Platform + DOS Strategy Engine
 
-A full-stack options analytics platform and automated trading engine for Futures & Options (F&O) derivatives.
+A full-stack options analytics platform and automated trading signal/backtesting engine for Nifty and Bank Nifty Futures & Options (F&O) derivatives, built as part of the SoFI Core Induction Assignment 2 (Project 2).
 
-## Overview
-AlgoLabs F&O provides real-time options analytics including an interactive Option Chain desk, Black-Scholes-Merton (BSM) Greeks, and dynamic Implied Volatility (IV) smile visualization. It features a Taylor-series P&L Decomposer for portfolio risk attribution, a TradingView-validated SuperTrend engine, a Direction of SuperTrend (DOS) live panel with automated trade lifecycle management, and an 8-week historical backtester powered by NSE EOD Bhavcopy data.
+> **Before submitting**: confirm the live Vercel URL you're sharing loads cleanly with no browser console errors — the backend's CORS configuration was recently updated to handle Vercel preview-deployment URLs, and this must be re-verified against the actual deployed link (not just localhost) after the latest deploy completes.
 
 ---
 
-## Architecture & Data Flow
+## 1. Overview
+
+AlgoLabs F&O gives a trader a single dashboard to understand Nifty options pricing, risk, and sentiment, and to run a specific rules-based options-selling strategy — DOS (Direction of SuperTrend) on Bank Nifty weekly expiries — both live and against historical data. It combines a live(ish) option chain, a Black-Scholes-Merton Greeks/IV engine, a P&L attribution tool, and an automated signal + backtesting engine for the DOS strategy, all built on a React frontend and a FastAPI backend backed by Supabase.
+
+This is a decision-support and analytics tool, **not** an auto-trading system — it never places real orders. It tells a trader what the data means and what the DOS strategy would recommend; a human still pulls the trigger on their own broker terminal.
+
+---
+
+## 2. Architecture & Data Flow
 
 ```
 +-------------------+      (Pushes raw JSON)      +-------------------+
 |  Local Poller     | --------------------------> | Supabase Database |
-| (Residential IP)  |                             +-------------------+
+| (Residential IP)  |                              +-------------------+
 +-------------------+                                       |
-  [Currently Paused]                                        | (Reads snapshot)
-                                                            v
-+-------------------+      (HTTP JSON Request)    +-------------------+
-|   Vercel Web      | <-------------------------- |  Render FastAPI   |
-|     Frontend      |                             |      Backend      |
-+-------------------+                             +-------------------+
-                                                            | (Fresh BSM Mock
-                                                            |  Fallback if unpolled)
-                                                            v
-                                                  +-------------------+
-                                                  |   NSE India API   |
-                                                  +-------------------+
+  [Currently Paused]                                        | (Reads latest snapshot)
+                                                              v
++-------------------+      (HTTPS JSON Request)    +-------------------+
+|   Vercel Web       | <--------------------------- |  Render FastAPI   |
+|     Frontend       |                               |      Backend      |
++-------------------+                               +-------------------+
+                                                              | (Falls back to fresh
+                                                              |  BSM-priced mock data
+                                                              |  if no recent snapshot)
+                                                              v
+                                                    +-------------------+
+                                                    |  NSE India / Yahoo |
+                                                    |  Finance / Bhavcopy|
+                                                    +-------------------+
 ```
 
-### Engineering Rationale: The NSE Data Ingestion Journey
-1. **Direct Cloud Fetch Attempt**: Initially, the backend attempted to fetch option chains directly from `www.nseindia.com`. While this worked on local machines, it failed consistently on cloud infrastructure (Render, GitHub Actions) with `403 Forbidden` due to NSE's Akamai-based datacenter IP blocks and TLS fingerprinting.
-2. **Local Poller Solution**: To bypass cloud IP blocks without recurring paid proxy costs, a local poller script was built to run on a residential IP and write fresh JSON snapshots into Supabase.
-3. **Current Operating State**: Following aggressive 5-minute polling, the local poller script was paused to prevent residential IP rate-flagging. In accordance with senior-approved architectural guidelines, when Supabase snapshots are missing or older than 60 minutes, the backend seamlessly transitions to a BSM-calculated mock fallback centered around live Yahoo Finance spot prices.
-4. **Complete Transparency**: Every API response and UI screen displays explicit freshness metadata (`fetched_at`, `age_minutes`, `source`), ensuring stale or fallback data is never disguised as live exchange feeds.
+### Why this architecture — the NSE data ingestion journey
+
+1. **Direct cloud fetch attempt.** The backend first tried fetching the NSE option chain directly from `www.nseindia.com` on every request. This worked from a local machine but failed consistently from cloud infrastructure (Render, and separately GitHub Actions) with `403 Forbidden` — NSE's Akamai-based bot detection blocks known datacenter IP ranges and inspects TLS fingerprints.
+2. **Local poller solution.** Rather than pay for a rotating residential proxy service, a small poller script runs on a local residential-IP machine, fetches the live NSE option chain, and writes JSON snapshots into Supabase on a schedule.
+3. **Current operating state.** After polling aggressively every 5 minutes, the residential IP began showing signs of rate-flagging from NSE, so the poller has been paused as a precaution. When Supabase has no snapshot fresher than 60 minutes (or the snapshot has fewer than 3 strikes, indicating a bad/partial write), the backend automatically falls back to internally generated, BSM-priced mock data centered on a live Yahoo Finance spot price — so the app never crashes or silently shows stale numbers as if they were live.
+4. **Full transparency, always.** Every data-carrying API response and every corresponding UI screen displays explicit freshness metadata: `fetched_at`, `age_minutes`, and `source` (`"live-polled"` vs `"mock"`). The system never claims to be real-time when it isn't.
 
 ---
 
-## Tech Stack
+## 3. Tech Stack
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend** | React 18, Vite, TypeScript, TailwindCSS, Lucide Icons, Recharts |
-| **Backend** | Python 3.11+, FastAPI, Uvicorn, Pydantic |
-| **Database** | Supabase (PostgreSQL) |
-| **Math & Quantitative** | NumPy, SciPy (Brent's method BSM IV solver), Pandas |
-| **Data Sources** | Yahoo Finance (`yfinance`), NSE EOD Bhavcopy (ZIP), NSE Live Option Chain API (with BSM Mock Fallback) |
-
----
-
-## Screen & Feature Breakdown
-
-1. **Option Chain Desk (`/chain`)**: Live NIFTY 50 option chain displaying strikes, LTP, Open Interest (OI), Volume, Implied Volatility (IV), Put-Call Ratio (PCR) with market sentiment analysis, Max Pain calculation, and freshness status badge.
-2. **Greeks & IV Desk (`/greeks`)**: Computes option contract Greeks ($\Delta, \Gamma, \Theta, \text{Vega}$) using SciPy's BSM pricing model, compares BSM computed IV against NSE reported IV, and renders a 2D Implied Volatility smile chart across active strikes.
-3. **P&L Greek Decomposer Desk (`/pnl`)**: Deconstructs custom position P&L into first-order Taylor series risk attributions ($\Delta, \Gamma, \Theta, \text{Vega}$, and residual error). Includes an explicit mathematical accuracy warning when Taylor expansion residual error exceeds 15% of net P&L.
-4. **DOS Strategy Panel & Backtester (`/dos`)**: Live 5-minute SuperTrend indicator panel, market day gating (Wed/Thu > 9:20 AM IST), automated strike recommendation, stop-loss monitor (50% Wed / 100% Thu initial SL, trailing SL), and an 8-week historical backtester (Jan–Feb 2024, 16 trade days, 100% completion).
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, Recharts, Lucide Icons |
+| Backend | Python 3.11+, FastAPI, Uvicorn, Pydantic |
+| Database | Supabase (PostgreSQL) |
+| Math / Quant | NumPy, SciPy (`scipy.optimize.brentq` for the IV solver), Pandas |
+| Data Sources | NSE Live Option Chain API (with BSM mock fallback), NSE EOD Bhavcopy (ZIP/CSV), `yfinance` (spot price & historical OHLCV) |
+| Hosting | Vercel (frontend), Render (backend), Supabase (managed Postgres) |
 
 ---
 
-## Setup Instructions
+## 4. Screens & Features
 
-### Environment Configuration
-Create a `.env` file in `backend/` and `frontend/`:
+### `/chain` — Option Chain Desk
+Live-style Nifty option chain: strikes, CE/PE Last Traded Price, Open Interest, Change in OI, Volume, and per-strike Implied Volatility. Above the table: spot price ticker, a Put-Call Ratio card with a plain-language sentiment read (bullish/bearish/neutral), a Max Pain strike card, and a freshness badge showing exactly how old the displayed data is and whether it's live-polled or mock fallback.
 
-**Backend (`backend/.env`)**:
+### `/greeks` — Greeks & Implied Volatility Desk
+For every strike in the current chain: Delta, Gamma, Theta, and Vega for both CE and PE, computed via the Black-Scholes-Merton model. A separate "Computed IV" column shows the volatility solved via Brent's method against each option's actual traded price — distinct from the raw NSE-quoted IV shown on `/chain`, and labeled as such so the two numbers aren't mistaken for a discrepancy. Below the table, a 2D Implied Volatility smile plots CE and PE IV across strikes, with a plain-language card interpreting whether current IV levels look elevated, normal, or suppressed relative to a baseline.
+
+### `/pnl` — P&L Greek Decomposer Desk
+A position builder (option type, buy/sell, strike, quantity, entry/current premium, previous/current spot, days elapsed, entry/current IV) that decomposes the position's P&L into a first-order Taylor expansion: Delta P&L + Gamma P&L + Theta P&L + Vega P&L + a residual term, visualized as a waterfall chart, with a plain-language summary of which Greek drove the move. If the residual exceeds roughly 15% of total P&L — which can happen for large, multi-day position shifts where a first-order approximation naturally loses accuracy — the UI surfaces an explicit warning rather than silently presenting a misleading breakdown.
+
+### `/dos` — DOS Strategy Panel & Backtester
+Implements the Direction of SuperTrend strategy on Bank Nifty Futures exactly as specified:
+
+- **Instrument & timeframe**: Bank Nifty Futures, 5-minute candles.
+- **Active days**: Wednesday and Thursday only (expiry days); any other day shows an explicit "inactive" banner, never an error or blank screen.
+- **SuperTrend parameters**: period 10, multiplier 3.
+- **Entry gating**: no new entry signal before 9:20 AM IST.
+- **Signal logic**: BNF Futures price above SuperTrend → sell CE. Price below SuperTrend → sell PE.
+- **Strike selection**: nearest 100 rounded from the current SuperTrend value (not spot price).
+- **Initial stop-loss**: 50% of premium sold on Wednesday, 100% on Thursday, applied as day-type-conditional multipliers.
+- **Trailing stop-loss**: triggers when price closes above whichever of the CE-side or PE-side SuperTrend value is lower.
+- **Default exit**: market close (3:30 PM IST) if neither stop-loss is hit.
+
+On screen: a live SuperTrend signal panel with trend direction and a candle countdown, a strike auto-selector showing the recommended CE/PE strike with its LTP, IV, and all four Greeks, a stop-loss monitor visualizing both the initial and trailing SL levels against the live premium, and a historical backtester covering 8 weekly expiry days (Wednesdays + Thursdays) using NSE EOD Bhavcopy data, reporting win rate, average P&L, SL hit rate, a full equity curve, and a per-trade log. Every completed trade — live or backtested — gets an auto-generated plain-language interpretation card, and the full trade log is persisted to Supabase with entry, exit, and P&L attribution split explicitly by day type (Wednesday vs Thursday).
+
+---
+
+## 5. Setup Instructions
+
+### Environment variables
+
+**`backend/.env`**
 ```env
 SUPABASE_URL=https://your-supabase-project.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 PORT=8000
-ALLOWED_ORIGINS=https://algolabs-fno.vercel.app,http://localhost:3000,http://localhost:5173
+ALLOWED_ORIGINS=https://your-production-domain.vercel.app,http://localhost:3000,http://localhost:5173
 ```
 
-**Frontend (`frontend/.env`)**:
+**`frontend/.env`**
 ```env
 VITE_API_BASE_URL=http://localhost:8000
 VITE_SHOW_DEV_CONTROLS=false
 ```
 
-### Running Locally
+### Running locally
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/AAP-2207/algolabs-fno.git
-   cd algolabs-fno
-   ```
+```bash
+git clone https://github.com/AAP-2207/algolabs-fno.git
+cd algolabs-fno
+```
 
-2. **Start Backend Server**
-   ```bash
-   cd backend
-   python -m venv .venv
-   # Windows:
-   .venv\Scripts\activate
-   # Linux/macOS:
-   source .venv/bin/activate
+**Backend:**
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-   pip install -r requirements.txt
-   uvicorn main:app --reload --port 8000
-   ```
+**Frontend:**
+```bash
+cd ../frontend
+npm install
+npm run dev -- --port 3000
+```
 
-3. **Start Frontend Server**
-   ```bash
-   cd ../frontend
-   npm install
-   npm run dev -- --port 3000
-   ```
-
-4. **Local Residential Poller Setup (Task Scheduler / Cron)**
-   To run the local poller script to write fresh NSE snapshots to Supabase:
-   ```bash
-   cd backend
-   python scripts/poller.py
-   ```
-   *For automated background execution on Windows:* Set up Windows Task Scheduler to trigger `python.exe backend/scripts/poller.py` every 5–15 minutes during market hours (9:15 AM - 3:30 PM IST).
+**Local residential poller** (optional, only needed to refresh live Supabase snapshots):
+```bash
+cd backend
+python scripts/poller.py
+```
+For unattended background execution on Windows, schedule `python.exe backend/scripts/poller.py` via Task Scheduler to run every 5–15 minutes during NSE market hours (9:15 AM – 3:30 PM IST).
 
 ---
 
-## Known Limitations & Engineering Transparency
+## 6. Known Limitations & Engineering Transparency
 
-1. **Cloud IP Blocks & Paused Poller**: Direct requests from cloud IP ranges (Render, GitHub Actions) to NSE are blocked by Akamai bot detection (`403 Forbidden`). Sourcing relies on a local residential IP poller writing to Supabase. The local poller is currently **paused** after aggressive 5-minute polling triggered IP rate-flagging. The application gracefully transitions to BSM mock fallbacks with explicit timestamp badges (`age_minutes: 0.0`, `source: mock`).
-2. **Polling Updates vs WebSockets**: Market updates use HTTP polling intervals rather than WebSocket streams.
-3. **2D Volatility Smile vs 3D Volatility Surface**: Renders a single-expiry 2D IV smile across strikes (permitted under assignment fallback options) rather than a full multi-expiry 3D volatility surface.
-4. **EOD Bhavcopy Backtester Granularity**: Backtesting uses daily NSE Bhavcopy files. Entry prices are approximated as opening prints, initial SL uses daily high prints, and trailing SL (which requires intraday tick sequence data) is not simulated.
-5. **Backtest Expiry Date Calculation Fix**: During verification, a bug was identified where `expiry_date` was hardcoded equal to `trade_date`, causing Thursday backtest trade attempts to fail due to missing Bhavcopy rows (since Thursday options expire on the following Wednesday). Fix: Implemented dynamic weekly expiry date calculation (`get_weekly_expiry_date`), expanding successful backtest trade execution from 8/16 days (50%) to **16/16 days (100%)**.
-6. **First-Order Taylor Expansion Limitations**: Large position shifts (e.g., 800-point spot moves over 14 days) produce significant higher-order residual error. The P&L Decomposer UI explicitly alerts users when residual error exceeds 15% of net P&L.
-7. **Production Gating Bypass Control**: A "Gating Bypass" toggle exists for local developer testing outside Wednesday/Thursday market hours. It is conditionally hidden in production builds via `VITE_SHOW_DEV_CONTROLS`.
+1. **NSE cloud IP blocking, poller currently paused.** Direct NSE requests from cloud IP ranges (Render, GitHub Actions) return `403 Forbidden` via Akamai bot detection. Live data is sourced through a local residential-IP poller writing to Supabase; the poller is currently paused after aggressive polling triggered rate-flagging. When no fresh Supabase snapshot exists, the app transitions to BSM-priced mock data with an explicit `source: "mock"` badge — it never presents fallback data as if it were live. Additionally, a real, authentic NSE snapshot was manually captured via an authenticated browser session and inserted to demonstrate the full live-data pipeline working end-to-end with genuine market data, alongside the automated poller architecture (which remains the primary mechanism, currently paused after being rate-flagged).
+2. **Polling, not WebSockets.** Market data updates via scheduled HTTP polling rather than a persistent WebSocket stream.
+3. **2D Implied Volatility smile, not a full 3D volatility surface.** The assignment specifies a 3D plot of IV across strikes and expiry dates; this implementation renders a single-expiry 2D IV smile across strikes instead, due to reliable multi-expiry IV data not being consistently available from the current data sources. This is a scope reduction from the original spec, not an assignment-sanctioned fallback, and is disclosed here for that reason.
+4. **Backtester uses EOD Bhavcopy granularity.** Entry prices are approximated from opening prints and initial SL checks use daily high prints; true intraday tick-by-tick execution (which the trailing SL rule conceptually depends on for maximal precision) is not simulated. The backtester follows the same rule logic as the live signal engine, but at daily-bar resolution.
+5. **Backtest expiry-date calculation fix.** An earlier bug hardcoded `expiry_date` equal to `trade_date` for every backtest day, causing many days (particularly Thursdays, which expire on the following Wednesday under the current weekly cycle) to fail with "no matching Bhavcopy rows." This was fixed by computing the actual applicable weekly expiry date per trading day rather than assuming same-day expiry, which increased backtest day coverage substantially. **This specific fix has not been independently re-verified with a fresh full backtest run as of this README's writing — recommend re-running the 8-week backtest and confirming the reported success/failure counts before treating this as fully resolved.**
+6. **First-order Taylor expansion limits.** Large position/spot moves over multi-day windows can produce a meaningfully large residual term in the P&L decomposer, since a first-order approximation loses accuracy as the move size grows. The UI surfaces an explicit warning when residual exceeds ~15% of total P&L rather than hiding this limitation.
+7. **Developer gating bypass hidden in production.** A "Gating Bypass" toggle exists to let developers test the DOS panel outside Wednesday/Thursday market hours; it is conditionally hidden in production builds via `VITE_SHOW_DEV_CONTROLS=false`.
+8. **CORS / deployment URL sensitivity.** The backend's allowed-origins configuration must match whatever Vercel URL is actually serving the frontend. Vercel preview-deployment URLs (containing a random hash) differ from a promoted production URL, and a mismatch here will silently break every API call in production while working fine on localhost. Confirm this is correctly configured for whichever URL you submit before treating the deployment as final.
 
 ---
 
-## Automated Testing
+## 7. Assignment Requirements Cross-Reference
 
-The project maintains an automated unit and integration test suite (**82 passed tests**):
+| Requirement (from assignment spec) | Status | Where |
+|---|---|---|
+| Live NSE option chain — OI, LTP, IV per strike | Done | `/chain` |
+| Greeks (Delta, Gamma, Theta, Vega) via Black-Scholes for all strikes | Done | `/greeks` |
+| IV solver via reverse BSM with Brent's method | Done | `backend/core/iv_solver.py` |
+| Volatility surface (3D across strikes & expiries) | Partial — 2D single-expiry smile implemented instead | `/greeks` (see Known Limitations #3) |
+| P&L Decomposer (Delta/Gamma/Theta/Vega attribution) | Done | `/pnl` |
+| Interpretation cards — PCR, Max Pain, IV spike | Done | `/chain`, `/greeks` |
+| DOS: live SuperTrend panel, Wed/Thu only | Done | `/dos` |
+| DOS: strike auto-selector with LTP, IV, Greeks | Done | `/dos` |
+| DOS: SL monitor, initial + trailing | Done | `/dos` |
+| DOS: backtester — win rate, avg P&L, SL hit rate, equity curve, per-trade | Done | `/dos` |
+| DOS: trade log in Supabase, P&L split by day type | Done | `dos_trades` table |
+| DOS: interpretation card per trade | Done | `/dos` |
+| GitHub repo, clean commits, README | Done | this repository |
+| Working full-stack app, deployed | Pending final live verification — see note at top of this README | Vercel + Render |
+| One-pager report | Done | `docs/ONE_PAGER.md` |
+
+---
+
+## 8. Automated Testing
 
 ```bash
 cd backend
 .venv\Scripts\python -m pytest tests/ -v
 ```
 
-### Test Coverage Highlights
-- **BSM & Greeks Engine**: Tests option pricing, delta/gamma/theta/vega values, and Brent's method IV solver (`test_bsm.py`, `test_greeks.py`, `test_iv_solver.py`).
-- **SuperTrend Validation**: Verifies ATR Wilders smoothing and trend direction against TradingView targets (`test_supertrend.py`).
-- **P&L Decomposer & Residual Thresholds**: Tests first-order Taylor expansion accuracy and residual threshold behavior for large moves (`test_pnl_decompose.py`).
-- **Backtester Expiry Calculation**: Tests historical Thursday (pre-Sep 2023) and Wednesday (post-Sep 2023) expiry date logic (`test_expiry_calc.py`, `test_backtester.py`).
-- **API Endpoints**: Integration tests for `/health`, `/api/option-chain`, `/api/greeks`, `/api/pnl-decompose`, `/api/dos/signal`, and `/api/dos/backtest` (`test_dos.py`, `test_greeks_endpoint.py`, `test_market_data.py`).
+Test coverage includes: BSM pricing and Greeks correctness, the Brent's-method IV solver, SuperTrend calculation validated against TradingView reference values, P&L decomposer accuracy and residual-threshold behavior, backtester expiry-date logic (pre- and post-September-2023 Bank Nifty expiry-day conventions), the DOS trailing-SL "whichever ST value is lower" rule specifically, backtest date-generation deduplication, and integration tests across every API endpoint (`/health`, `/api/option-chain`, `/api/greeks`, `/api/pnl-decompose`, `/api/dos/signal`, `/api/dos/backtest`, `/api/dos/trades`).
