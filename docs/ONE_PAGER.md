@@ -4,7 +4,7 @@
 
 AlgoLabs F&O was built to deliver a complete derivatives analytics suite and trade-lifecycle strategy engine:
 - **Option Chain Desk (`/chain`)**: Interactive NIFTY 50 option chain with LTP, OI, Volume, Implied Volatility (IV), Put-Call Ratio (PCR) sentiment analysis, Max Pain calculation, and freshness timestamp badges.
-- **Greeks & Implied Volatility Desk (`/greeks`)**: Black-Scholes-Merton (BSM) risk Greeks ($\Delta, \Gamma, \Theta, \text{Vega}$) computed using SciPy, BSM-computed IV vs NSE reported IV comparison, and 2D IV smile visualization.
+- **Greeks & Implied Volatility Desk (`/greeks`)**: Black-Scholes-Merton (BSM) risk Greeks ($\Delta, \Gamma, \Theta, \text{Vega}$) computed using SciPy, BSM-computed IV vs NSE reported IV comparison, 2D IV smile visualization, and a 3D Volatility Surface across strikes and expiry dates (with simulated multi-expiry data clearly labeled).
 - **P&L Greek Decomposer Desk (`/pnl`)**: First-order Taylor series risk attribution ($\Delta, \Gamma, \Theta, \text{Vega}$, residual) with an explicit user warning when residual error exceeds 15% of net P&L.
 - **DOS Strategy Panel & Backtester (`/dos`)**: TradingView-validated SuperTrend 5-minute signal panel, Wed/Thu gating logic, automated strike recommendations, stop-loss monitor (50% Wed / 100% Thu initial SL, trailing SL), and an 8-week historical backtester (Jan–Feb 2024, 16 trade days, 100% completion).
 
@@ -29,6 +29,7 @@ AlgoLabs F&O was built to deliver a complete derivatives analytics suite and tra
 ## 4. What Would Be Improved With More Time
 
 1. **WebSockets Integration**: Transition from HTTP polling to WebSockets for sub-second streaming option chain ticks.
-2. **3D Volatility Surface**: Expand the single-expiry 2D IV smile into a multi-expiry 3D volatility surface.
+2. **Live Multi-Expiry Feed**: Ingest live multi-expiry option chain feeds across all upcoming weekly/monthly cycles to replace the simulated multi-expiry feed on the 3D volatility surface.
 3. **Automated Poller Failover & Safe Resumption**: Implement automated proxy rotation for the poller and resume background ingestion at a safe, rate-limit-friendly interval (e.g. 15 minutes).
 4. **Intraday Granularity Backtester**: Ingest intraday 5-minute options tick data to model intraday trailing stop-losses in historical backtests.
+

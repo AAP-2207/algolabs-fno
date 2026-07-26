@@ -16,9 +16,12 @@ else:
     origins = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://localhost:3002",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:3002",
         "https://algolabs-fno.vercel.app",
     ]
+
     frontend_env = os.environ.get("FRONTEND_URL", "").strip()
     if frontend_env:
         origins.append(frontend_env)

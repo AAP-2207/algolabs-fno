@@ -22,6 +22,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import { Activity, AlertTriangle, Info, TrendingUp } from "lucide-react";
+import { VolatilitySurface3D } from "../components/VolatilitySurface3D";
+
 
 // Local Greeks Fallback Data in case the backend is loading or offline
 const fallbackGreeksData: GreeksResponse = {
@@ -388,8 +390,12 @@ export const GreeksPage: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* 3D VOLATILITY SURFACE (Strikes x Expiry Dates x IV) */}
+        <VolatilitySurface3D symbol="NIFTY" />
+
       </main>
     </div>
   );
 };
 export default GreeksPage;
+

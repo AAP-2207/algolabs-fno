@@ -216,3 +216,118 @@ def get_option_chain(symbol: str = "NIFTY") -> Dict[str, Any]:
             f"Falling back to mock data."
         )
         return get_mock_data(symbol_upper)
+
+
+def get_multi_expiry_mock_data(symbol: str = "NIFTY") -> Dict[str, Any]:
+    """
+    Generates realistic synthetic multi-expiry option chain data for NIFTY / BANKNIFTY.
+    
+    Term Structure & Skew Implementation Choice:
+    - Term Structure: Calm market term structure with a small upward slope for far-dated expiries
+      (base_iv(T) = 0.13 + 0.04 * sqrt(T)), ranging from ~13.4% for 4-day expiry to ~14.6% for 60-day expiry.
+    - Volatility Skew: Standard equity index put skew (higher IV for lower strike prices),
+      modeled via iv = base_iv - 0.15 * moneyness + 0.20 * moneyness^2.
+    - Pricing / Math: Call and Put prices for every synthetic (strike, expiry) point are computed
+      using the REAL, tested Black-Scholes-Merton pricing function bs_price from core/bsm.py.
+    """
+    import yfinance as yf
+    import random
+    import math
+    import datetime
+
+    symbol_upper = symbol.upper()
+    ticker_map = {"BANKNIFTY": "^NSEBANK", "NIFTY": "^NSEI"}
+    yf_ticker = ticker_map.get(symbol_upper if symbol_upper in ticker_map else ("BANKNIFTY" if "BANK" in symbol_upper else "NIFTY"))
+
+    fallback_underlying = 52300.0 if "BANK" in symbol_upper else 24300.0
+
+    try:
+        ticker = yf.Ticker(yf_ticker)
+        hist = ticker.history(period="1d", interval="5m")
+        if not hist.empty:
+            underlying = float(hist["Close"].iloc[-1])
+        else:
+            underlying = fallback_underlying
+    except Exception:
+        underlying = fallback_underlying
+
+    # ATM strike and strikes range
+    strike_step = 100 if "BANK" in symbol_upper else 50
+    atm_strike = round(underlying / strike_step) * strike_step
+    offsets = [-300, -200, -100, -50, 0, 50, 100, 200, 300] if "BANK" in symbol_upper else [-300, -200, -100, -50, 0, 50, 100, 200, 300]
+    strikes = [atm_strike + off for off in offsets]
+
+    # Standard upcoming expiries (4d, 11d, 18d, 32d, 60d out)
+    today = datetime.date.today()
+    expiry_offsets_days = [4, 11, 18, 32, 60]
+    expiry_dates = [(today + datetime.timedelta(days=d)).strftime("%Y-%m-%d") for d in expiry_offsets_days]
+
+    records_data = []
+    r_rate = 0.06
+
+    for days, expiry_str in zip(expiry_offsets_days, expiry_dates):
+        T = days / 365.0
+        # Term structure base IV (upward sloping for farther expiries)
+        base_iv = 0.13 + 0.04 * math.sqrt(T)
+
+        for strike in strikes:
+            moneyness = (strike - underlying) / underlying
+            # Volatility skew formula (higher IV for lower strikes / OTM Puts)
+            iv_val = base_iv - 0.15 * moneyness + 0.20 * (moneyness ** 2)
+            iv_val = max(0.05, min(0.90, iv_val)) # clamp to sane bounds [5%, 90%]
+
+            # Price options using exact core BSM pricing function
+            ce_price = bs_price(S=underlying, K=strike, T=T, r=r_rate, sigma=iv_val, option_type="call")
+            pe_price = bs_price(S=underlying, K=strike, T=T, r=r_rate, sigma=iv_val, option_type="put")
+            ce_price = max(ce_price, 1.0)
+            pe_price = max(pe_price, 1.0)
+
+            # OI distribution peaking near ATM
+            dist = abs(strike - underlying) / (underlying * 0.02)
+            base_oi = int(60000 * math.exp(-0.5 * dist**2) / (1 + 0.2 * math.sqrt(T)))
+            ce_oi = max(500, base_oi + random.randint(100, 500))
+            pe_oi = max(500, int(base_oi * 1.1) + random.randint(100, 500))
+
+            records_data.append({
+                "strikePrice": strike,
+                "expiryDate": expiry_str,
+                "CE": {
+                    "strikePrice": strike,
+                    "expiryDate": expiry_str,
+                    "underlying": symbol_upper,
+                    "identifier": f"OPT{symbol_upper}{expiry_str}CE{strike}",
+                    "openInterest": ce_oi,
+                    "changeinOpenInterest": int(ce_oi * 0.05),
+                    "totalTradedVolume": int(ce_oi * 2.5),
+                    "impliedVolatility": round(iv_val * 100.0, 2),
+                    "lastPrice": round(ce_price, 2),
+                    "underlyingValue": underlying
+                },
+                "PE": {
+                    "strikePrice": strike,
+                    "expiryDate": expiry_str,
+                    "underlying": symbol_upper,
+                    "identifier": f"OPT{symbol_upper}{expiry_str}PE{strike}",
+                    "openInterest": pe_oi,
+                    "changeinOpenInterest": int(pe_oi * 0.06),
+                    "totalTradedVolume": int(pe_oi * 2.7),
+                    "impliedVolatility": round(iv_val * 100.0, 2),
+                    "lastPrice": round(pe_price, 2),
+                    "underlyingValue": underlying
+                }
+            })
+
+    return {
+        "source": "simulated-multi-expiry",
+        "note": "Multi-expiry data simulated due to NSE live API access restrictions (403) on this deployment; single-expiry IV smile above uses real/near-real data.",
+        "records": {
+            "expiryDates": expiry_dates,
+            "underlyingValue": underlying,
+            "timestamp": today.strftime("%d-%b-%Y 15:30:00"),
+            "data": records_data
+        },
+        "filtered": {
+            "data": records_data
+        }
+    }
+

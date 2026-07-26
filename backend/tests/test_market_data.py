@@ -48,3 +48,25 @@ def test_get_historical_ohlcv():
     assert isinstance(first_row["low"], float)
     assert isinstance(first_row["close"], float)
     assert isinstance(first_row["volume"], int)
+
+def test_get_vol_surface():
+    response = client.get("/api/vol-surface?symbol=NIFTY")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "NIFTY"
+    assert data["source"] == "simulated-multi-expiry"
+    assert "note" in data
+    assert "simulated" in data["note"].lower()
+    assert data["distinct_expiries_count"] >= 4
+    assert data["distinct_strikes_count"] >= 5
+    assert data["filtered_points_count"] > 0
+    assert len(data["points"]) == data["filtered_points_count"]
+    
+    # Check sample point
+    sample = data["points"][0]
+    assert "strike" in sample
+    assert "expiry_date" in sample
+    assert "days_to_expiry" in sample
+    assert "computed_iv" in sample
+    assert sample["computed_iv"] > 0
+
