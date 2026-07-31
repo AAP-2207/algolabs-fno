@@ -134,9 +134,6 @@ export const VolatilitySurface3D: React.FC<VolatilitySurface3DProps> = ({ symbol
     .filter((p) => p.expiry_date === farExpiry)
     .reduce((sum, p) => sum + p.computed_iv, 0) / (data.points.filter((p) => p.expiry_date === farExpiry).length || 1);
 
-  const atmStrike = strikes.reduce((prev, curr) =>
-    Math.abs(curr - data.underlying_value) < Math.abs(prev - data.underlying_value) ? curr : prev
-  );
   const lowStrike = strikes[0];
   const highStrike = strikes[strikes.length - 1];
 

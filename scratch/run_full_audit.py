@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 
 BASE_FE_URL = "http://localhost:3001"
 BASE_BE_URL = "http://127.0.0.1:8000"
-ROOT_DIR = r"c:\Users\armaa\OneDrive\Documents\f&o_sofi\algolabs-fno"
+ROOT_DIR = r"c:\Users\armaa\OneDrive\Documents\fo_sofi\algolabs-fno"
 SCREENSHOT_DIR = os.path.join(ROOT_DIR, "audit_screenshots")
 AUDIT_DATA_PATH = os.path.join(ROOT_DIR, "scratch", "audit_data.json")
 
