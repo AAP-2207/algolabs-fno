@@ -20,7 +20,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core.supertrend import calculate_supertrend, get_current_signal
-from core.backtester import run_backtest
+from core.backtester import run_backtest, get_weekly_expiry_date
 from services.bhavcopy import BhavcopyFetchError
 try:
     from .market_data import get_greeks
@@ -354,26 +354,36 @@ class BacktestRequest(BaseModel):
     weeks: Optional[int] = 4
 
 
+def _is_last_thursday_of_month(d: date) -> bool:
+    return d.weekday() == 3 and (d + timedelta(days=7)).month != d.month
+
+
 def _generate_expiry_dates(start_date: date, weeks: int) -> list[date]:
     """
-    Generates both Wednesday and Thursday expiry dates for each of the `weeks`
-    consecutive weeks starting from start_date (resulting in 2 * weeks total expiry days).
-    Ensures unique, deduplicated dates.
+    Generates exactly one expiry date per week for the `weeks` consecutive weeks
+    starting from start_date. Uses get_weekly_expiry_date for standard weekly
+    regimes (Thursday before Sep 2023, Wednesday after) and shifts to Thursday
+    for monthly-expiry weeks (last Thursday of the month).
     """
     dates = []
-    # If start_date is not Wednesday (weekday != 2), find the Wednesday of that week
-    wed_offset = (2 - start_date.weekday()) % 7
-    base_wed = start_date + timedelta(days=wed_offset)
+    # Find the standard weekly expiry of the starting date's week
+    base_expiry = get_weekly_expiry_date(start_date)
 
     for i in range(weeks):
-        wed = base_wed + timedelta(weeks=i)
-        thu = wed + timedelta(days=1)
-        if wed not in dates:
-            dates.append(wed)
-        if thu not in dates:
-            dates.append(thu)
+        next_base = base_expiry + timedelta(weeks=i)
+        if next_base >= date(2023, 9, 4):
+            # In the Wednesday weekly expiry regime
+            # Check if the Thursday of this week is the last Thursday of the month
+            thu_of_week = next_base + timedelta(days=1)
+            if _is_last_thursday_of_month(thu_of_week):
+                dates.append(thu_of_week)
+            else:
+                dates.append(next_base)
+        else:
+            # In the Thursday weekly expiry regime
+            dates.append(next_base)
 
-    return sorted(list(dict.fromkeys(dates)))
+    return dates
 
 
 
