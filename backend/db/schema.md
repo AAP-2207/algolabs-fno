@@ -31,3 +31,19 @@ create table dos_trades (
   created_at timestamptz default now()
 );
 ```
+
+## 3. Bhavcopy Options Cache (`bhavcopy_cache`)
+
+Caches filtered BANKNIFTY option contracts fetched from NSE. This avoids hitting `nsearchives.nseindia.com` live from cloud environments (e.g. Render) where egress is blocked.
+
+### SQL Schema Definition
+
+To create the `bhavcopy_cache` table in Supabase, execute the following SQL query in the Supabase SQL Editor:
+
+```sql
+create table bhavcopy_cache (
+  trade_date date primary key,
+  data jsonb not null,
+  created_at timestamptz default now()
+);
+```

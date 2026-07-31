@@ -149,8 +149,10 @@ For unattended background execution on Windows, schedule `python.exe backend/scr
 6. **First-order Taylor expansion limits.** Large position/spot moves over multi-day windows can produce a meaningfully large residual term in the P&L decomposer, since a first-order approximation loses accuracy as the move size grows. The UI surfaces an explicit warning when residual exceeds ~15% of total P&L rather than hiding this limitation.
 7. **Developer gating bypass hidden in production.** A "Gating Bypass" toggle exists to let developers test the DOS panel outside Wednesday/Thursday market hours; it is conditionally hidden in production builds via `VITE_SHOW_DEV_CONTROLS=false`.
 8. **CORS / deployment URL sensitivity.** The backend's allowed-origins configuration handles Vercel preview-deployment subdomains dynamically using a CORS regex pattern (`https://algolabs-.*\.vercel\.app`) in `CORSMiddleware`. This automatically matches all unique preview hash subdomains generated for project deployments, while keeping static entries for localhost and the promoted production URL. If `ALLOWED_ORIGINS` is set in the Render environment variables, it serves as the explicit allowed origins list, but standard Vercel subdomains are supported out-of-the-box.
+9. **F&O Bhavcopy cloud IP blocking.** Live F&O Bhavcopy zip downloads from `nsearchives.nseindia.com` get blocked with a `403 Forbidden` from Render's cloud IP (same Akamai restriction as the live option chain). To solve this, we implemented a Supabase-based cache table `bhavcopy_cache` that stores the parsed and filtered `BANKNIFTY` options data. The backend checks this cache first before making a live HTTP request to NSE. A local backfill script (`backend/scripts/backfill_bhavcopy.py`) was executed from a residential IP to pre-seed this cache for all weekly expiries in the backtest range (Jan-Feb 2024), guaranteeing 100% successful backtests in production without hitting NSE.
 
 ---
+
 
 ## 7. Assignment Requirements Cross-Reference
 

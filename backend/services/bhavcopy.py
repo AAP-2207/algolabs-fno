@@ -20,11 +20,31 @@ Pick backtest dates from this window, not from any recent date.
 
 import io
 import zipfile
+import os
 from datetime import date
 from typing import Optional
 
 import pandas as pd
 import requests
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+load_dotenv()
+
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+
+# Standardize Supabase URL (strip trailing rest/v1 or rest/v1/ paths)
+if supabase_url and (supabase_url.endswith("/rest/v1/") or supabase_url.endswith("/rest/v1")):
+    supabase_url = supabase_url.replace("/rest/v1/", "").replace("/rest/v1", "")
+
+supabase_client: Optional[Client] = None
+if supabase_url and supabase_key:
+    try:
+        supabase_client = create_client(supabase_url, supabase_key)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to initialize Supabase client in bhavcopy.py: {e}")
 
 BHAVCOPY_URL_TEMPLATE = (
     "https://nsearchives.nseindia.com/content/fo/"
@@ -136,18 +156,51 @@ def get_banknifty_options(
     for weekly-options backtesting to isolate a specific expiry week's
     contracts from the many expiries present in any single day's file).
     """
-    raw = fetch_bhavcopy_raw(trade_date)
-    df = parse_bhavcopy_zip(raw)
+    import logging
+    logger = logging.getLogger(__name__)
 
-    df = df[df["TckrSymb"] == "BANKNIFTY"].copy()
-    df = df[df["OptnTp"].isin(["CE", "PE"])].copy()
+    df = None
 
-    if df.empty:
-        raise BhavcopyFetchError(
-            f"No BANKNIFTY option rows found for {trade_date}. This could mean: "
-            f"(a) the date is outside the window when Bank Nifty weekly options "
-            f"existed (May 2016 - Nov 2024), or (b) it's a non-trading day."
-        )
+    # 1. Try to read from Supabase cache first
+    if supabase_client is not None:
+        try:
+            date_str = trade_date.isoformat()
+            res = supabase_client.table("bhavcopy_cache").select("data").eq("trade_date", date_str).execute()
+            if res.data and len(res.data) > 0:
+                cached_data = res.data[0].get("data")
+                if cached_data:
+                    df = pd.DataFrame(cached_data)
+                    logger.info(f"Loaded BANKNIFTY options for {trade_date} from Supabase cache.")
+        except Exception as e:
+            logger.warning(f"Failed to read from Supabase bhavcopy_cache for {trade_date}: {e}. Falling back to live NSE fetch.")
+
+    # 2. Fall back to live NSE fetch if cache lookup missed or failed
+    if df is None:
+        raw = fetch_bhavcopy_raw(trade_date)
+        df_raw = parse_bhavcopy_zip(raw)
+
+        df = df_raw[df_raw["TckrSymb"] == "BANKNIFTY"].copy()
+        df = df[df["OptnTp"].isin(["CE", "PE"])].copy()
+
+        if df.empty:
+            raise BhavcopyFetchError(
+                f"No BANKNIFTY option rows found for {trade_date}. This could mean: "
+                f"(a) the date is outside the window when Bank Nifty weekly options "
+                f"existed (May 2016 - Nov 2024), or (b) it's a non-trading day."
+            )
+
+        # 3. Save to Supabase cache for future requests
+        if supabase_client is not None:
+            try:
+                date_str = trade_date.isoformat()
+                records = df.to_dict(orient="records")
+                supabase_client.table("bhavcopy_cache").upsert({
+                    "trade_date": date_str,
+                    "data": records
+                }).execute()
+                logger.info(f"Successfully cached BANKNIFTY options for {trade_date} in Supabase.")
+            except Exception as e:
+                logger.warning(f"Failed to write to Supabase bhavcopy_cache for {trade_date}: {e}")
 
     df["XpryDt"] = pd.to_datetime(df["XpryDt"], errors="coerce")
     df["TradDt"] = pd.to_datetime(df["TradDt"], errors="coerce")
