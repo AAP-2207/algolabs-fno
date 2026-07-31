@@ -26,10 +26,11 @@ else:
     if frontend_env:
         origins.append(frontend_env)
 
-# Enable CORS middleware with scoped origins
+# Enable CORS middleware with scoped origins and dynamic Vercel subdomains
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://algolabs-.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
